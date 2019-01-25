@@ -1,0 +1,24 @@
+{
+  "name": "openlayers",
+  "version": "1.0.0",
+  "description": "openlayer demo",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "parcel index.html",
+    "build": "parcel build --public-url . index.html"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tom110/openlayers.git"
+  },
+  "author": "tom",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tom110/openlayers/issues"
+  },
+  "homepage": "https://github.com/tom110/openlayers#readme",
+  "devDependencies": {
+    "parcel-bundler": "^1.11.0"
+  }
+}
