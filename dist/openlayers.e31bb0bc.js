@@ -59895,8 +59895,18 @@ map.on('singleclick', function (evt) {
     dataTYPE: "jsonp",
     success: function success(json) {
       var result = JSON.stringify(json);
-      console.log(result);
-      overlay.setPosition(coordinate);
+
+      if (json.features.length > 0) {
+        overlay.setPosition(coordinate);
+        var properties = json.features[0].properties;
+        var popup_content = $("#popup-content");
+        popup_content.empty();
+        var popup_content_innerstr = "";
+        $.each(properties, function (n, v) {
+          popup_content_innerstr = popup_content_innerstr + "<span>" + n + ":" + v + "</span><br/>";
+        });
+        popup_content.append(popup_content_innerstr);
+      }
     }
   });
 });
@@ -59927,7 +59937,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "7311" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "8231" + '/');
 
   ws.onmessage = function (event) {
     var data = JSON.parse(event.data);
