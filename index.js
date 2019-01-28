@@ -2,10 +2,13 @@ import Map from 'ol/Map.js';
 import View from 'ol/View.js';
 import TileLayer from 'ol/layer/Tile.js';
 import OSM from 'ol/source/OSM.js';
-import TileWMS from 'ol/source/TileWMS.js';
 import Overlay from 'ol/Overlay.js';
 import ImageLayer from 'ol/layer/Image.js';
 import ImageWMS from 'ol/source/ImageWMS.js';
+
+import GeoJSON from 'ol/format.js';
+import {Vector as VectorLayer} from 'ol/layer.js';
+import VectorSource from 'ol/source/Vector.js';
 
 var $ =require("jquery");
 
@@ -54,6 +57,40 @@ var wmsLayer = new ImageLayer({
 
 
 
+/**
+ * geoserver WFS服务
+ * */
+var vectorSource = new VectorSource();
+var vector = new VectorLayer({
+    source: vectorSource,
+    // style: new Style({
+    //     stroke: new Stroke({
+    //         color: 'rgba(0, 0, 255, 1.0)',
+    //         width: 2
+    //     })
+    // })
+});
+
+//http请求数据
+fetch('http://192.168.50.254:12222/geoserver/postgis/wfs?' +
+    'service=wfs&' +
+    'version=2.0.0&' +
+    'request=GetFeature&' +
+    'typeNames=postgis:环翠区海洋牧场位置 （测绘院）&' +
+    'outputFormat=application/json', {
+    method: 'GET',
+}).then(function (response) {
+    console.log(response);
+    return response.json();
+}).then(function (json) {
+    console.log(json);
+    var features = new GeoJSON().readFeatures(json);
+    vectorSource.addFeatures(features);
+    map.getView().fit(vectorSource.getExtent());
+});
+
+
+
 var map = new Map({
     layers: [
         new TileLayer({
@@ -68,7 +105,8 @@ var map = new Map({
         //         }
         //     })
         // }),
-        wmsLayer
+        wmsLayer,
+        vector
     ],
     overlays: [overlay],
     target: 'map',

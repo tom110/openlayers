@@ -46941,515 +46941,7 @@ function (XYZ) {
 
 var _default = OSM;
 exports.default = _default;
-},{"./XYZ.js":"../node_modules/ol/source/XYZ.js"}],"../node_modules/ol/source/common.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.DEFAULT_WMS_VERSION = void 0;
-
-/**
- * @module ol/source/common
- */
-
-/**
- * Default WMS version.
- * @type {string}
- */
-var DEFAULT_WMS_VERSION = '1.3.0';
-exports.DEFAULT_WMS_VERSION = DEFAULT_WMS_VERSION;
-},{}],"../node_modules/ol/source/WMSServerType.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-/**
- * @module ol/source/WMSServerType
- */
-
-/**
- * Available server types: `'carmentaserver'`, `'geoserver'`, `'mapserver'`,
- *     `'qgis'`. These are servers that have vendor parameters beyond the WMS
- *     specification that OpenLayers can make use of.
- * @enum {string}
- */
-var _default = {
-  CARMENTA_SERVER: 'carmentaserver',
-  GEOSERVER: 'geoserver',
-  MAPSERVER: 'mapserver',
-  QGIS: 'qgis'
-};
-exports.default = _default;
-},{}],"../node_modules/ol/uri.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.appendParams = appendParams;
-
-/**
- * @module ol/uri
- */
-
-/**
- * Appends query parameters to a URI.
- *
- * @param {string} uri The original URI, which may already have query data.
- * @param {!Object} params An object where keys are URI-encoded parameter keys,
- *     and the values are arbitrary types or arrays.
- * @return {string} The new URI.
- */
-function appendParams(uri, params) {
-  var keyParams = []; // Skip any null or undefined parameter values
-
-  Object.keys(params).forEach(function (k) {
-    if (params[k] !== null && params[k] !== undefined) {
-      keyParams.push(k + '=' + encodeURIComponent(params[k]));
-    }
-  });
-  var qs = keyParams.join('&'); // remove any trailing ? or &
-
-  uri = uri.replace(/[?&]$/, ''); // append ? or & depending on whether uri has existing parameters
-
-  uri = uri.indexOf('?') === -1 ? uri + '?' : uri + '&';
-  return uri + qs;
-}
-},{}],"../node_modules/ol/source/TileWMS.js":[function(require,module,exports) {
-"use strict";
-
-Object.defineProperty(exports, "__esModule", {
-  value: true
-});
-exports.default = void 0;
-
-var _common = require("./common.js");
-
-var _asserts = require("../asserts.js");
-
-var _extent = require("../extent.js");
-
-var _obj = require("../obj.js");
-
-var _math = require("../math.js");
-
-var _proj = require("../proj.js");
-
-var _reproj = require("../reproj.js");
-
-var _size = require("../size.js");
-
-var _TileImage = _interopRequireDefault(require("./TileImage.js"));
-
-var _WMSServerType = _interopRequireDefault(require("./WMSServerType.js"));
-
-var _tilecoord = require("../tilecoord.js");
-
-var _string = require("../string.js");
-
-var _uri = require("../uri.js");
-
-function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-
-/**
- * @module ol/source/TileWMS
- */
-
-/**
- * @typedef {Object} Options
- * @property {import("./Source.js").AttributionLike} [attributions] Attributions.
- * @property {number} [cacheSize=2048] Cache size.
- * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images.  Note that
- * you must provide a `crossOrigin` value if you are using the WebGL renderer or if you want to
- * access pixel data with the Canvas renderer.  See
- * https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
- * @property {Object<string,*>} params WMS request parameters.
- * At least a `LAYERS` param is required. `STYLES` is
- * `''` by default. `VERSION` is `1.3.0` by default. `WIDTH`, `HEIGHT`, `BBOX`
- * and `CRS` (`SRS` for WMS version < 1.3.0) will be set dynamically.
- * @property {number} [gutter=0]
- * The size in pixels of the gutter around image tiles to ignore. By setting
- * this property to a non-zero value, images will be requested that are wider
- * and taller than the tile size by a value of `2 x gutter`.
- * Using a non-zero value allows artifacts of rendering at tile edges to be
- * ignored. If you control the WMS service it is recommended to address
- * "artifacts at tile edges" issues by properly configuring the WMS service. For
- * example, MapServer has a `tile_map_edge_buffer` configuration parameter for
- * this. See http://mapserver.org/output/tile_mode.html.
- * @property {boolean} [hidpi=true] Use the `ol/Map#pixelRatio` value when requesting
- * the image from the remote server.
- * @property {import("../proj.js").ProjectionLike} projection Projection.
- * @property {number} [reprojectionErrorThreshold=0.5] Maximum allowed reprojection error (in pixels).
- * Higher values can increase reprojection performance, but decrease precision.
- * @property {typeof import("../ImageTile.js").default} [tileClass] Class used to instantiate image tiles.
- * Default is {@link module:ol/ImageTile~ImageTile}.
- * @property {import("../tilegrid/TileGrid.js").default} [tileGrid] Tile grid. Base this on the resolutions,
- * tilesize and extent supported by the server.
- * If this is not defined, a default grid will be used: if there is a projection
- * extent, the grid will be based on that; if not, a grid based on a global
- * extent with origin at 0,0 will be used..
- * @property {import("./WMSServerType.js").default|string} [serverType]
- * The type of the remote WMS server. Currently only used when `hidpi` is
- * `true`.
- * @property {import("../Tile.js").LoadFunction} [tileLoadFunction] Optional function to load a tile given a URL. The default is
- * ```js
- * function(imageTile, src) {
- *   imageTile.getImage().src = src;
- * };
- * ```
- * @property {string} [url] WMS service URL.
- * @property {Array<string>} [urls] WMS service urls.
- * Use this instead of `url` when the WMS supports multiple urls for GetMap requests.
- * @property {boolean} [wrapX=true] Whether to wrap the world horizontally.
- * When set to `false`, only one world
- * will be rendered. When `true`, tiles will be requested for one world only,
- * but they will be wrapped horizontally to render multiple worlds.
- * @property {number} [transition] Duration of the opacity transition for rendering.
- * To disable the opacity transition, pass `transition: 0`.
- */
-
-/**
- * @classdesc
- * Layer source for tile data from WMS servers.
- * @api
- */
-var TileWMS =
-/*@__PURE__*/
-function (TileImage) {
-  function TileWMS(opt_options) {
-    var options = opt_options ||
-    /** @type {Options} */
-    {};
-    var params = options.params || {};
-    var transparent = 'TRANSPARENT' in params ? params['TRANSPARENT'] : true;
-    TileImage.call(this, {
-      attributions: options.attributions,
-      cacheSize: options.cacheSize,
-      crossOrigin: options.crossOrigin,
-      opaque: !transparent,
-      projection: options.projection,
-      reprojectionErrorThreshold: options.reprojectionErrorThreshold,
-      tileClass: options.tileClass,
-      tileGrid: options.tileGrid,
-      tileLoadFunction: options.tileLoadFunction,
-      tileUrlFunction: tileUrlFunction,
-      url: options.url,
-      urls: options.urls,
-      wrapX: options.wrapX !== undefined ? options.wrapX : true,
-      transition: options.transition
-    });
-    /**
-     * @private
-     * @type {number}
-     */
-
-    this.gutter_ = options.gutter !== undefined ? options.gutter : 0;
-    /**
-     * @private
-     * @type {!Object}
-     */
-
-    this.params_ = params;
-    /**
-     * @private
-     * @type {boolean}
-     */
-
-    this.v13_ = true;
-    /**
-     * @private
-     * @type {import("./WMSServerType.js").default|undefined}
-     */
-
-    this.serverType_ =
-    /** @type {import("./WMSServerType.js").default|undefined} */
-    options.serverType;
-    /**
-     * @private
-     * @type {boolean}
-     */
-
-    this.hidpi_ = options.hidpi !== undefined ? options.hidpi : true;
-    /**
-     * @private
-     * @type {import("../extent.js").Extent}
-     */
-
-    this.tmpExtent_ = (0, _extent.createEmpty)();
-    this.updateV13_();
-    this.setKey(this.getKeyForParams_());
-  }
-
-  if (TileImage) TileWMS.__proto__ = TileImage;
-  TileWMS.prototype = Object.create(TileImage && TileImage.prototype);
-  TileWMS.prototype.constructor = TileWMS;
-  /**
-   * Return the GetFeatureInfo URL for the passed coordinate, resolution, and
-   * projection. Return `undefined` if the GetFeatureInfo URL cannot be
-   * constructed.
-   * @param {import("../coordinate.js").Coordinate} coordinate Coordinate.
-   * @param {number} resolution Resolution.
-   * @param {import("../proj.js").ProjectionLike} projection Projection.
-   * @param {!Object} params GetFeatureInfo params. `INFO_FORMAT` at least should
-   *     be provided. If `QUERY_LAYERS` is not provided then the layers specified
-   *     in the `LAYERS` parameter will be used. `VERSION` should not be
-   *     specified here.
-   * @return {string|undefined} GetFeatureInfo URL.
-   * @api
-   */
-
-  TileWMS.prototype.getGetFeatureInfoUrl = function getGetFeatureInfoUrl(coordinate, resolution, projection, params) {
-    var projectionObj = (0, _proj.get)(projection);
-    var sourceProjectionObj = this.getProjection();
-    var tileGrid = this.getTileGrid();
-
-    if (!tileGrid) {
-      tileGrid = this.getTileGridForProjection(projectionObj);
-    }
-
-    var tileCoord = tileGrid.getTileCoordForCoordAndResolution(coordinate, resolution);
-
-    if (tileGrid.getResolutions().length <= tileCoord[0]) {
-      return undefined;
-    }
-
-    var tileResolution = tileGrid.getResolution(tileCoord[0]);
-    var tileExtent = tileGrid.getTileCoordExtent(tileCoord, this.tmpExtent_);
-    var tileSize = (0, _size.toSize)(tileGrid.getTileSize(tileCoord[0]), this.tmpSize);
-    var gutter = this.gutter_;
-
-    if (gutter !== 0) {
-      tileSize = (0, _size.buffer)(tileSize, gutter, this.tmpSize);
-      tileExtent = (0, _extent.buffer)(tileExtent, tileResolution * gutter, tileExtent);
-    }
-
-    if (sourceProjectionObj && sourceProjectionObj !== projectionObj) {
-      tileResolution = (0, _reproj.calculateSourceResolution)(sourceProjectionObj, projectionObj, coordinate, tileResolution);
-      tileExtent = (0, _proj.transformExtent)(tileExtent, projectionObj, sourceProjectionObj);
-      coordinate = (0, _proj.transform)(coordinate, projectionObj, sourceProjectionObj);
-    }
-
-    var baseParams = {
-      'SERVICE': 'WMS',
-      'VERSION': _common.DEFAULT_WMS_VERSION,
-      'REQUEST': 'GetFeatureInfo',
-      'FORMAT': 'image/png',
-      'TRANSPARENT': true,
-      'QUERY_LAYERS': this.params_['LAYERS']
-    };
-    (0, _obj.assign)(baseParams, this.params_, params);
-    var x = Math.floor((coordinate[0] - tileExtent[0]) / tileResolution);
-    var y = Math.floor((tileExtent[3] - coordinate[1]) / tileResolution);
-    baseParams[this.v13_ ? 'I' : 'X'] = x;
-    baseParams[this.v13_ ? 'J' : 'Y'] = y;
-    return this.getRequestUrl_(tileCoord, tileSize, tileExtent, 1, sourceProjectionObj || projectionObj, baseParams);
-  };
-  /**
-   * @inheritDoc
-   */
-
-
-  TileWMS.prototype.getGutter = function getGutter() {
-    return this.gutter_;
-  };
-  /**
-   * Get the user-provided params, i.e. those passed to the constructor through
-   * the "params" option, and possibly updated using the updateParams method.
-   * @return {Object} Params.
-   * @api
-   */
-
-
-  TileWMS.prototype.getParams = function getParams() {
-    return this.params_;
-  };
-  /**
-   * @param {import("../tilecoord.js").TileCoord} tileCoord Tile coordinate.
-   * @param {import("../size.js").Size} tileSize Tile size.
-   * @param {import("../extent.js").Extent} tileExtent Tile extent.
-   * @param {number} pixelRatio Pixel ratio.
-   * @param {import("../proj/Projection.js").default} projection Projection.
-   * @param {Object} params Params.
-   * @return {string|undefined} Request URL.
-   * @private
-   */
-
-
-  TileWMS.prototype.getRequestUrl_ = function getRequestUrl_(tileCoord, tileSize, tileExtent, pixelRatio, projection, params) {
-    var urls = this.urls;
-
-    if (!urls) {
-      return undefined;
-    }
-
-    params['WIDTH'] = tileSize[0];
-    params['HEIGHT'] = tileSize[1];
-    params[this.v13_ ? 'CRS' : 'SRS'] = projection.getCode();
-
-    if (!('STYLES' in this.params_)) {
-      params['STYLES'] = '';
-    }
-
-    if (pixelRatio != 1) {
-      switch (this.serverType_) {
-        case _WMSServerType.default.GEOSERVER:
-          var dpi = 90 * pixelRatio + 0.5 | 0;
-
-          if ('FORMAT_OPTIONS' in params) {
-            params['FORMAT_OPTIONS'] += ';dpi:' + dpi;
-          } else {
-            params['FORMAT_OPTIONS'] = 'dpi:' + dpi;
-          }
-
-          break;
-
-        case _WMSServerType.default.MAPSERVER:
-          params['MAP_RESOLUTION'] = 90 * pixelRatio;
-          break;
-
-        case _WMSServerType.default.CARMENTA_SERVER:
-        case _WMSServerType.default.QGIS:
-          params['DPI'] = 90 * pixelRatio;
-          break;
-
-        default:
-          (0, _asserts.assert)(false, 52); // Unknown `serverType` configured
-
-          break;
-      }
-    }
-
-    var axisOrientation = projection.getAxisOrientation();
-    var bbox = tileExtent;
-
-    if (this.v13_ && axisOrientation.substr(0, 2) == 'ne') {
-      var tmp;
-      tmp = tileExtent[0];
-      bbox[0] = tileExtent[1];
-      bbox[1] = tmp;
-      tmp = tileExtent[2];
-      bbox[2] = tileExtent[3];
-      bbox[3] = tmp;
-    }
-
-    params['BBOX'] = bbox.join(',');
-    var url;
-
-    if (urls.length == 1) {
-      url = urls[0];
-    } else {
-      var index = (0, _math.modulo)((0, _tilecoord.hash)(tileCoord), urls.length);
-      url = urls[index];
-    }
-
-    return (0, _uri.appendParams)(url, params);
-  };
-  /**
-   * @inheritDoc
-   */
-
-
-  TileWMS.prototype.getTilePixelRatio = function getTilePixelRatio(pixelRatio) {
-    return !this.hidpi_ || this.serverType_ === undefined ? 1 :
-    /** @type {number} */
-    pixelRatio;
-  };
-  /**
-   * @private
-   * @return {string} The key for the current params.
-   */
-
-
-  TileWMS.prototype.getKeyForParams_ = function getKeyForParams_() {
-    var i = 0;
-    var res = [];
-
-    for (var key in this.params_) {
-      res[i++] = key + '-' + this.params_[key];
-    }
-
-    return res.join('/');
-  };
-  /**
-   * Update the user-provided params.
-   * @param {Object} params Params.
-   * @api
-   */
-
-
-  TileWMS.prototype.updateParams = function updateParams(params) {
-    (0, _obj.assign)(this.params_, params);
-    this.updateV13_();
-    this.setKey(this.getKeyForParams_());
-  };
-  /**
-   * @private
-   */
-
-
-  TileWMS.prototype.updateV13_ = function updateV13_() {
-    var version = this.params_['VERSION'] || _common.DEFAULT_WMS_VERSION;
-    this.v13_ = (0, _string.compareVersions)(version, '1.3') >= 0;
-  };
-
-  return TileWMS;
-}(_TileImage.default);
-/**
- * @param {import("../tilecoord.js").TileCoord} tileCoord The tile coordinate
- * @param {number} pixelRatio The pixel ratio
- * @param {import("../proj/Projection.js").default} projection The projection
- * @return {string|undefined} The tile URL
- * @this {TileWMS}
- */
-
-
-function tileUrlFunction(tileCoord, pixelRatio, projection) {
-  var tileGrid = this.getTileGrid();
-
-  if (!tileGrid) {
-    tileGrid = this.getTileGridForProjection(projection);
-  }
-
-  if (tileGrid.getResolutions().length <= tileCoord[0]) {
-    return undefined;
-  }
-
-  if (pixelRatio != 1 && (!this.hidpi_ || this.serverType_ === undefined)) {
-    pixelRatio = 1;
-  }
-
-  var tileResolution = tileGrid.getResolution(tileCoord[0]);
-  var tileExtent = tileGrid.getTileCoordExtent(tileCoord, this.tmpExtent_);
-  var tileSize = (0, _size.toSize)(tileGrid.getTileSize(tileCoord[0]), this.tmpSize);
-  var gutter = this.gutter_;
-
-  if (gutter !== 0) {
-    tileSize = (0, _size.buffer)(tileSize, gutter, this.tmpSize);
-    tileExtent = (0, _extent.buffer)(tileExtent, tileResolution * gutter, tileExtent);
-  }
-
-  if (pixelRatio != 1) {
-    tileSize = (0, _size.scale)(tileSize, pixelRatio, this.tmpSize);
-  }
-
-  var baseParams = {
-    'SERVICE': 'WMS',
-    'VERSION': _common.DEFAULT_WMS_VERSION,
-    'REQUEST': 'GetMap',
-    'FORMAT': 'image/png',
-    'TRANSPARENT': true
-  };
-  (0, _obj.assign)(baseParams, this.params_);
-  return this.getRequestUrl_(tileCoord, tileSize, tileExtent, pixelRatio, projection, baseParams);
-}
-
-var _default = TileWMS;
-exports.default = _default;
-},{"./common.js":"../node_modules/ol/source/common.js","../asserts.js":"../node_modules/ol/asserts.js","../extent.js":"../node_modules/ol/extent.js","../obj.js":"../node_modules/ol/obj.js","../math.js":"../node_modules/ol/math.js","../proj.js":"../node_modules/ol/proj.js","../reproj.js":"../node_modules/ol/reproj.js","../size.js":"../node_modules/ol/size.js","./TileImage.js":"../node_modules/ol/source/TileImage.js","./WMSServerType.js":"../node_modules/ol/source/WMSServerType.js","../tilecoord.js":"../node_modules/ol/tilecoord.js","../string.js":"../node_modules/ol/string.js","../uri.js":"../node_modules/ol/uri.js"}],"../node_modules/ol/OverlayPositioning.js":[function(require,module,exports) {
+},{"./XYZ.js":"../node_modules/ol/source/XYZ.js"}],"../node_modules/ol/OverlayPositioning.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -48175,7 +47667,25 @@ function (Layer) {
 ImageLayer.prototype.getSource;
 var _default = ImageLayer;
 exports.default = _default;
-},{"../LayerType.js":"../node_modules/ol/LayerType.js","./Layer.js":"../node_modules/ol/layer/Layer.js"}],"../node_modules/ol/Image.js":[function(require,module,exports) {
+},{"../LayerType.js":"../node_modules/ol/LayerType.js","./Layer.js":"../node_modules/ol/layer/Layer.js"}],"../node_modules/ol/source/common.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.DEFAULT_WMS_VERSION = void 0;
+
+/**
+ * @module ol/source/common
+ */
+
+/**
+ * Default WMS version.
+ * @type {string}
+ */
+var DEFAULT_WMS_VERSION = '1.3.0';
+exports.DEFAULT_WMS_VERSION = DEFAULT_WMS_VERSION;
+},{}],"../node_modules/ol/Image.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -48803,7 +48313,67 @@ function defaultImageLoadFunction(image, src) {
 
 var _default = ImageSource;
 exports.default = _default;
-},{"../util.js":"../node_modules/ol/util.js","../reproj/common.js":"../node_modules/ol/reproj/common.js","../ImageState.js":"../node_modules/ol/ImageState.js","../array.js":"../node_modules/ol/array.js","../events/Event.js":"../node_modules/ol/events/Event.js","../extent.js":"../node_modules/ol/extent.js","../proj.js":"../node_modules/ol/proj.js","../reproj/Image.js":"../node_modules/ol/reproj/Image.js","./Source.js":"../node_modules/ol/source/Source.js"}],"../node_modules/ol/source/ImageWMS.js":[function(require,module,exports) {
+},{"../util.js":"../node_modules/ol/util.js","../reproj/common.js":"../node_modules/ol/reproj/common.js","../ImageState.js":"../node_modules/ol/ImageState.js","../array.js":"../node_modules/ol/array.js","../events/Event.js":"../node_modules/ol/events/Event.js","../extent.js":"../node_modules/ol/extent.js","../proj.js":"../node_modules/ol/proj.js","../reproj/Image.js":"../node_modules/ol/reproj/Image.js","./Source.js":"../node_modules/ol/source/Source.js"}],"../node_modules/ol/source/WMSServerType.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+/**
+ * @module ol/source/WMSServerType
+ */
+
+/**
+ * Available server types: `'carmentaserver'`, `'geoserver'`, `'mapserver'`,
+ *     `'qgis'`. These are servers that have vendor parameters beyond the WMS
+ *     specification that OpenLayers can make use of.
+ * @enum {string}
+ */
+var _default = {
+  CARMENTA_SERVER: 'carmentaserver',
+  GEOSERVER: 'geoserver',
+  MAPSERVER: 'mapserver',
+  QGIS: 'qgis'
+};
+exports.default = _default;
+},{}],"../node_modules/ol/uri.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.appendParams = appendParams;
+
+/**
+ * @module ol/uri
+ */
+
+/**
+ * Appends query parameters to a URI.
+ *
+ * @param {string} uri The original URI, which may already have query data.
+ * @param {!Object} params An object where keys are URI-encoded parameter keys,
+ *     and the values are arbitrary types or arrays.
+ * @return {string} The new URI.
+ */
+function appendParams(uri, params) {
+  var keyParams = []; // Skip any null or undefined parameter values
+
+  Object.keys(params).forEach(function (k) {
+    if (params[k] !== null && params[k] !== undefined) {
+      keyParams.push(k + '=' + encodeURIComponent(params[k]));
+    }
+  });
+  var qs = keyParams.join('&'); // remove any trailing ? or &
+
+  uri = uri.replace(/[?&]$/, ''); // append ? or & depending on whether uri has existing parameters
+
+  uri = uri.indexOf('?') === -1 ? uri + '?' : uri + '&';
+  return uri + qs;
+}
+},{}],"../node_modules/ol/source/ImageWMS.js":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -49209,7 +48779,20017 @@ function (ImageSource) {
 
 var _default = ImageWMS;
 exports.default = _default;
-},{"./common.js":"../node_modules/ol/source/common.js","../Image.js":"../node_modules/ol/Image.js","../asserts.js":"../node_modules/ol/asserts.js","../events.js":"../node_modules/ol/events.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","../extent.js":"../node_modules/ol/extent.js","../obj.js":"../node_modules/ol/obj.js","../proj.js":"../node_modules/ol/proj.js","../reproj.js":"../node_modules/ol/reproj.js","./Image.js":"../node_modules/ol/source/Image.js","./WMSServerType.js":"../node_modules/ol/source/WMSServerType.js","../string.js":"../node_modules/ol/string.js","../uri.js":"../node_modules/ol/uri.js"}],"../node_modules/process/browser.js":[function(require,module,exports) {
+},{"./common.js":"../node_modules/ol/source/common.js","../Image.js":"../node_modules/ol/Image.js","../asserts.js":"../node_modules/ol/asserts.js","../events.js":"../node_modules/ol/events.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","../extent.js":"../node_modules/ol/extent.js","../obj.js":"../node_modules/ol/obj.js","../proj.js":"../node_modules/ol/proj.js","../reproj.js":"../node_modules/ol/reproj.js","./Image.js":"../node_modules/ol/source/Image.js","./WMSServerType.js":"../node_modules/ol/source/WMSServerType.js","../string.js":"../node_modules/ol/string.js","../uri.js":"../node_modules/ol/uri.js"}],"../node_modules/ol/format/Feature.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.transformWithOptions = transformWithOptions;
+exports.default = void 0;
+
+var _obj = require("../obj.js");
+
+var _util = require("../util.js");
+
+var _proj = require("../proj.js");
+
+/**
+ * @module ol/format/Feature
+ */
+
+/**
+ * @typedef {Object} ReadOptions
+ * @property {import("../proj.js").ProjectionLike} [dataProjection] Projection of the data we are reading.
+ * If not provided, the projection will be derived from the data (where possible) or
+ * the `dataProjection` of the format is assigned (where set). If the projection
+ * can not be derived from the data and if no `dataProjection` is set for a format,
+ * the features will not be reprojected.
+ * @property {import("../extent.js").Extent} [extent] Tile extent of the tile being read. This is only used and
+ * required for {@link module:ol/format/MVT}.
+ * @property {import("../proj.js").ProjectionLike} [featureProjection] Projection of the feature geometries
+ * created by the format reader. If not provided, features will be returned in the
+ * `dataProjection`.
+ */
+
+/**
+ * @typedef {Object} WriteOptions
+ * @property {import("../proj.js").ProjectionLike} [dataProjection] Projection of the data we are writing.
+ * If not provided, the `dataProjection` of the format is assigned (where set).
+ * If no `dataProjection` is set for a format, the features will be returned
+ * in the `featureProjection`.
+ * @property {import("../proj.js").ProjectionLike} [featureProjection] Projection of the feature geometries
+ * that will be serialized by the format writer. If not provided, geometries are assumed
+ * to be in the `dataProjection` if that is set; in other words, they are not transformed.
+ * @property {boolean} [rightHanded] When writing geometries, follow the right-hand
+ * rule for linear ring orientation.  This means that polygons will have counter-clockwise
+ * exterior rings and clockwise interior rings.  By default, coordinates are serialized
+ * as they are provided at construction.  If `true`, the right-hand rule will
+ * be applied.  If `false`, the left-hand rule will be applied (clockwise for
+ * exterior and counter-clockwise for interior rings).  Note that not all
+ * formats support this.  The GeoJSON format does use this property when writing
+ * geometries.
+ * @property {number} [decimals] Maximum number of decimal places for coordinates.
+ * Coordinates are stored internally as floats, but floating-point arithmetic can create
+ * coordinates with a large number of decimal places, not generally wanted on output.
+ * Set a number here to round coordinates. Can also be used to ensure that
+ * coordinates read in can be written back out with the same number of decimals.
+ * Default is no rounding.
+ */
+
+/**
+ * @classdesc
+ * Abstract base class; normally only used for creating subclasses and not
+ * instantiated in apps.
+ * Base class for feature formats.
+ * {FeatureFormat} subclasses provide the ability to decode and encode
+ * {@link module:ol/Feature~Feature} objects from a variety of commonly used geospatial
+ * file formats.  See the documentation for each format for more details.
+ *
+ * @abstract
+ * @api
+ */
+var FeatureFormat = function FeatureFormat() {
+  /**
+   * @protected
+   * @type {import("../proj/Projection.js").default}
+   */
+  this.dataProjection = null;
+  /**
+   * @protected
+   * @type {import("../proj/Projection.js").default}
+   */
+
+  this.defaultFeatureProjection = null;
+};
+/**
+ * Adds the data projection to the read options.
+ * @param {Document|Node|Object|string} source Source.
+ * @param {ReadOptions=} opt_options Options.
+ * @return {ReadOptions|undefined} Options.
+ * @protected
+ */
+
+
+FeatureFormat.prototype.getReadOptions = function getReadOptions(source, opt_options) {
+  var options;
+
+  if (opt_options) {
+    options = {
+      dataProjection: opt_options.dataProjection ? opt_options.dataProjection : this.readProjection(source),
+      featureProjection: opt_options.featureProjection
+    };
+  }
+
+  return this.adaptOptions(options);
+};
+/**
+ * Sets the `dataProjection` on the options, if no `dataProjection`
+ * is set.
+ * @param {WriteOptions|ReadOptions|undefined} options
+ *   Options.
+ * @protected
+ * @return {WriteOptions|ReadOptions|undefined}
+ *   Updated options.
+ */
+
+
+FeatureFormat.prototype.adaptOptions = function adaptOptions(options) {
+  return (0, _obj.assign)({
+    dataProjection: this.dataProjection,
+    featureProjection: this.defaultFeatureProjection
+  }, options);
+};
+/**
+ * Get the extent from the source of the last {@link readFeatures} call.
+ * @return {import("../extent.js").Extent} Tile extent.
+ */
+
+
+FeatureFormat.prototype.getLastExtent = function getLastExtent() {
+  return null;
+};
+/**
+ * @abstract
+ * @return {import("./FormatType.js").default} Format.
+ */
+
+
+FeatureFormat.prototype.getType = function getType() {
+  return (0, _util.abstract)();
+};
+/**
+ * Read a single feature from a source.
+ *
+ * @abstract
+ * @param {Document|Node|Object|string} source Source.
+ * @param {ReadOptions=} opt_options Read options.
+ * @return {import("../Feature.js").FeatureLike} Feature.
+ */
+
+
+FeatureFormat.prototype.readFeature = function readFeature(source, opt_options) {
+  return (0, _util.abstract)();
+};
+/**
+ * Read all features from a source.
+ *
+ * @abstract
+ * @param {Document|Node|ArrayBuffer|Object|string} source Source.
+ * @param {ReadOptions=} opt_options Read options.
+ * @return {Array<import("../Feature.js").FeatureLike>} Features.
+ */
+
+
+FeatureFormat.prototype.readFeatures = function readFeatures(source, opt_options) {
+  return (0, _util.abstract)();
+};
+/**
+ * Read a single geometry from a source.
+ *
+ * @abstract
+ * @param {Document|Node|Object|string} source Source.
+ * @param {ReadOptions=} opt_options Read options.
+ * @return {import("../geom/Geometry.js").default} Geometry.
+ */
+
+
+FeatureFormat.prototype.readGeometry = function readGeometry(source, opt_options) {
+  return (0, _util.abstract)();
+};
+/**
+ * Read the projection from a source.
+ *
+ * @abstract
+ * @param {Document|Node|Object|string} source Source.
+ * @return {import("../proj/Projection.js").default} Projection.
+ */
+
+
+FeatureFormat.prototype.readProjection = function readProjection(source) {
+  return (0, _util.abstract)();
+};
+/**
+ * Encode a feature in this format.
+ *
+ * @abstract
+ * @param {import("../Feature.js").default} feature Feature.
+ * @param {WriteOptions=} opt_options Write options.
+ * @return {string} Result.
+ */
+
+
+FeatureFormat.prototype.writeFeature = function writeFeature(feature, opt_options) {
+  return (0, _util.abstract)();
+};
+/**
+ * Encode an array of features in this format.
+ *
+ * @abstract
+ * @param {Array<import("../Feature.js").default>} features Features.
+ * @param {WriteOptions=} opt_options Write options.
+ * @return {string} Result.
+ */
+
+
+FeatureFormat.prototype.writeFeatures = function writeFeatures(features, opt_options) {
+  return (0, _util.abstract)();
+};
+/**
+ * Write a single geometry in this format.
+ *
+ * @abstract
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {WriteOptions=} opt_options Write options.
+ * @return {string} Result.
+ */
+
+
+FeatureFormat.prototype.writeGeometry = function writeGeometry(geometry, opt_options) {
+  return (0, _util.abstract)();
+};
+
+var _default = FeatureFormat;
+/**
+ * @param {import("../geom/Geometry.js").default|import("../extent.js").Extent} geometry Geometry.
+ * @param {boolean} write Set to true for writing, false for reading.
+ * @param {(WriteOptions|ReadOptions)=} opt_options Options.
+ * @return {import("../geom/Geometry.js").default|import("../extent.js").Extent} Transformed geometry.
+ */
+
+exports.default = _default;
+
+function transformWithOptions(geometry, write, opt_options) {
+  var featureProjection = opt_options ? (0, _proj.get)(opt_options.featureProjection) : null;
+  var dataProjection = opt_options ? (0, _proj.get)(opt_options.dataProjection) : null;
+  /**
+   * @type {import("../geom/Geometry.js").default|import("../extent.js").Extent}
+   */
+
+  var transformed;
+
+  if (featureProjection && dataProjection && !(0, _proj.equivalent)(featureProjection, dataProjection)) {
+    if (Array.isArray(geometry)) {
+      // FIXME this is necessary because GML treats extents
+      // as geometries
+      transformed = (0, _proj.transformExtent)(geometry, dataProjection, featureProjection);
+    } else {
+      transformed = (write ?
+      /** @type {import("../geom/Geometry").default} */
+      geometry.clone() : geometry).transform(write ? featureProjection : dataProjection, write ? dataProjection : featureProjection);
+    }
+  } else {
+    transformed = geometry;
+  }
+
+  if (write && opt_options &&
+  /** @type {WriteOptions} */
+  opt_options.decimals !== undefined && !Array.isArray(transformed)) {
+    var power = Math.pow(10,
+    /** @type {WriteOptions} */
+    opt_options.decimals); // if decimals option on write, round each coordinate appropriately
+
+    /**
+     * @param {Array<number>} coordinates Coordinates.
+     * @return {Array<number>} Transformed coordinates.
+     */
+
+    var transform = function (coordinates) {
+      for (var i = 0, ii = coordinates.length; i < ii; ++i) {
+        coordinates[i] = Math.round(coordinates[i] * power) / power;
+      }
+
+      return coordinates;
+    };
+
+    if (transformed === geometry) {
+      transformed =
+      /** @type {import("../geom/Geometry").default} */
+      geometry.clone();
+    }
+
+    transformed.applyTransform(transform);
+  }
+
+  return transformed;
+}
+},{"../obj.js":"../node_modules/ol/obj.js","../util.js":"../node_modules/ol/util.js","../proj.js":"../node_modules/ol/proj.js"}],"../node_modules/ol/format/JSONFeature.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _util = require("../util.js");
+
+var _Feature = _interopRequireDefault(require("./Feature.js"));
+
+var _FormatType = _interopRequireDefault(require("./FormatType.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/JSONFeature
+ */
+
+/**
+ * @classdesc
+ * Abstract base class; normally only used for creating subclasses and not
+ * instantiated in apps.
+ * Base class for JSON feature formats.
+ *
+ * @abstract
+ */
+var JSONFeature =
+/*@__PURE__*/
+function (FeatureFormat) {
+  function JSONFeature() {
+    FeatureFormat.call(this);
+  }
+
+  if (FeatureFormat) JSONFeature.__proto__ = FeatureFormat;
+  JSONFeature.prototype = Object.create(FeatureFormat && FeatureFormat.prototype);
+  JSONFeature.prototype.constructor = JSONFeature;
+  /**
+   * @inheritDoc
+   */
+
+  JSONFeature.prototype.getType = function getType() {
+    return _FormatType.default.JSON;
+  };
+  /**
+   * Read a feature.  Only works for a single feature. Use `readFeatures` to
+   * read a feature collection.
+   *
+   * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @return {import("../Feature.js").default} Feature.
+   * @api
+   */
+
+
+  JSONFeature.prototype.readFeature = function readFeature(source, opt_options) {
+    return this.readFeatureFromObject(getObject(source), this.getReadOptions(source, opt_options));
+  };
+  /**
+   * Read all features.  Works with both a single feature and a feature
+   * collection.
+   *
+   * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @return {Array<import("../Feature.js").default>} Features.
+   * @api
+   */
+
+
+  JSONFeature.prototype.readFeatures = function readFeatures(source, opt_options) {
+    return this.readFeaturesFromObject(getObject(source), this.getReadOptions(source, opt_options));
+  };
+  /**
+   * @abstract
+   * @param {Object} object Object.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @protected
+   * @return {import("../Feature.js").default} Feature.
+   */
+
+
+  JSONFeature.prototype.readFeatureFromObject = function readFeatureFromObject(object, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * @abstract
+   * @param {Object} object Object.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @protected
+   * @return {Array<import("../Feature.js").default>} Features.
+   */
+
+
+  JSONFeature.prototype.readFeaturesFromObject = function readFeaturesFromObject(object, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Read a geometry.
+   *
+   * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @return {import("../geom/Geometry.js").default} Geometry.
+   * @api
+   */
+
+
+  JSONFeature.prototype.readGeometry = function readGeometry(source, opt_options) {
+    return this.readGeometryFromObject(getObject(source), this.getReadOptions(source, opt_options));
+  };
+  /**
+   * @abstract
+   * @param {Object} object Object.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @protected
+   * @return {import("../geom/Geometry.js").default} Geometry.
+   */
+
+
+  JSONFeature.prototype.readGeometryFromObject = function readGeometryFromObject(object, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Read the projection.
+   *
+   * @param {ArrayBuffer|Document|Node|Object|string} source Source.
+   * @return {import("../proj/Projection.js").default} Projection.
+   * @api
+   */
+
+
+  JSONFeature.prototype.readProjection = function readProjection(source) {
+    return this.readProjectionFromObject(getObject(source));
+  };
+  /**
+   * @abstract
+   * @param {Object} object Object.
+   * @protected
+   * @return {import("../proj/Projection.js").default} Projection.
+   */
+
+
+  JSONFeature.prototype.readProjectionFromObject = function readProjectionFromObject(object) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Encode a feature as string.
+   *
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {string} Encoded feature.
+   * @api
+   */
+
+
+  JSONFeature.prototype.writeFeature = function writeFeature(feature, opt_options) {
+    return JSON.stringify(this.writeFeatureObject(feature, opt_options));
+  };
+  /**
+   * @abstract
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {Object} Object.
+   */
+
+
+  JSONFeature.prototype.writeFeatureObject = function writeFeatureObject(feature, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Encode an array of features as string.
+   *
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {string} Encoded features.
+   * @api
+   */
+
+
+  JSONFeature.prototype.writeFeatures = function writeFeatures(features, opt_options) {
+    return JSON.stringify(this.writeFeaturesObject(features, opt_options));
+  };
+  /**
+   * @abstract
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {Object} Object.
+   */
+
+
+  JSONFeature.prototype.writeFeaturesObject = function writeFeaturesObject(features, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Encode a geometry as string.
+   *
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {string} Encoded geometry.
+   * @api
+   */
+
+
+  JSONFeature.prototype.writeGeometry = function writeGeometry(geometry, opt_options) {
+    return JSON.stringify(this.writeGeometryObject(geometry, opt_options));
+  };
+  /**
+   * @abstract
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {Object} Object.
+   */
+
+
+  JSONFeature.prototype.writeGeometryObject = function writeGeometryObject(geometry, opt_options) {
+    return (0, _util.abstract)();
+  };
+
+  return JSONFeature;
+}(_Feature.default);
+/**
+ * @param {Document|Node|Object|string} source Source.
+ * @return {Object} Object.
+ */
+
+
+function getObject(source) {
+  if (typeof source === 'string') {
+    var object = JSON.parse(source);
+    return object ?
+    /** @type {Object} */
+    object : null;
+  } else if (source !== null) {
+    return source;
+  } else {
+    return null;
+  }
+}
+
+var _default = JSONFeature;
+exports.default = _default;
+},{"../util.js":"../node_modules/ol/util.js","./Feature.js":"../node_modules/ol/format/Feature.js","./FormatType.js":"../node_modules/ol/format/FormatType.js"}],"../node_modules/ol/format/EsriJSON.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _asserts = require("../asserts.js");
+
+var _extent = require("../extent.js");
+
+var _Feature2 = require("./Feature.js");
+
+var _JSONFeature = _interopRequireDefault(require("./JSONFeature.js"));
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _GeometryType = _interopRequireDefault(require("../geom/GeometryType.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _LinearRing = _interopRequireDefault(require("../geom/LinearRing.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _MultiPoint = _interopRequireDefault(require("../geom/MultiPoint.js"));
+
+var _MultiPolygon = _interopRequireDefault(require("../geom/MultiPolygon.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _Polygon = _interopRequireDefault(require("../geom/Polygon.js"));
+
+var _deflate = require("../geom/flat/deflate.js");
+
+var _orient = require("../geom/flat/orient.js");
+
+var _obj = require("../obj.js");
+
+var _proj = require("../proj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/EsriJSON
+ */
+
+/**
+ * @typedef {import("arcgis-rest-api").Feature} EsriJSONFeature
+ * @typedef {import("arcgis-rest-api").FeatureSet} EsriJSONFeatureSet
+ * @typedef {import("arcgis-rest-api").Geometry} EsriJSONGeometry
+ * @typedef {import("arcgis-rest-api").Point} EsriJSONPoint
+ * @typedef {import("arcgis-rest-api").Polyline} EsriJSONPolyline
+ * @typedef {import("arcgis-rest-api").Polygon} EsriJSONPolygon
+ * @typedef {import("arcgis-rest-api").Multipoint} EsriJSONMultipoint
+ * @typedef {import("arcgis-rest-api").HasZM} EsriJSONHasZM
+ * @typedef {import("arcgis-rest-api").Position} EsriJSONPosition
+ * @typedef {import("arcgis-rest-api").SpatialReferenceWkid} EsriJSONSpatialReferenceWkid
+ */
+
+/**
+ * @typedef {Object} EsriJSONMultiPolygon
+ * @property {Array<Array<Array<Array<number>>>>} rings Rings for the MultiPolygon.
+ * @property {boolean} [hasM] If the polygon coordinates have an M value.
+ * @property {boolean} [hasZ] If the polygon coordinates have a Z value.
+ * @property {EsriJSONSpatialReferenceWkid} [spatialReference] The coordinate reference system.
+ */
+
+/**
+ * @const
+ * @type {Object<import("../geom/GeometryType.js").default, function(EsriJSONGeometry): import("../geom/Geometry.js").default>}
+ */
+var GEOMETRY_READERS = {};
+GEOMETRY_READERS[_GeometryType.default.POINT] = readPointGeometry;
+GEOMETRY_READERS[_GeometryType.default.LINE_STRING] = readLineStringGeometry;
+GEOMETRY_READERS[_GeometryType.default.POLYGON] = readPolygonGeometry;
+GEOMETRY_READERS[_GeometryType.default.MULTI_POINT] = readMultiPointGeometry;
+GEOMETRY_READERS[_GeometryType.default.MULTI_LINE_STRING] = readMultiLineStringGeometry;
+GEOMETRY_READERS[_GeometryType.default.MULTI_POLYGON] = readMultiPolygonGeometry;
+/**
+ * @const
+ * @type {Object<string, function(import("../geom/Geometry.js").default, import("./Feature.js").WriteOptions=): (EsriJSONGeometry)>}
+ */
+
+var GEOMETRY_WRITERS = {};
+GEOMETRY_WRITERS[_GeometryType.default.POINT] = writePointGeometry;
+GEOMETRY_WRITERS[_GeometryType.default.LINE_STRING] = writeLineStringGeometry;
+GEOMETRY_WRITERS[_GeometryType.default.POLYGON] = writePolygonGeometry;
+GEOMETRY_WRITERS[_GeometryType.default.MULTI_POINT] = writeMultiPointGeometry;
+GEOMETRY_WRITERS[_GeometryType.default.MULTI_LINE_STRING] = writeMultiLineStringGeometry;
+GEOMETRY_WRITERS[_GeometryType.default.MULTI_POLYGON] = writeMultiPolygonGeometry;
+/**
+ * @typedef {Object} Options
+ * @property {string} [geometryName] Geometry name to use when creating features.
+ */
+
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the EsriJSON format.
+ *
+ * @api
+ */
+
+var EsriJSON =
+/*@__PURE__*/
+function (JSONFeature) {
+  function EsriJSON(opt_options) {
+    var options = opt_options ? opt_options : {};
+    JSONFeature.call(this);
+    /**
+     * Name of the geometry attribute for features.
+     * @type {string|undefined}
+     * @private
+     */
+
+    this.geometryName_ = options.geometryName;
+  }
+
+  if (JSONFeature) EsriJSON.__proto__ = JSONFeature;
+  EsriJSON.prototype = Object.create(JSONFeature && JSONFeature.prototype);
+  EsriJSON.prototype.constructor = EsriJSON;
+  /**
+   * @inheritDoc
+   */
+
+  EsriJSON.prototype.readFeatureFromObject = function readFeatureFromObject(object, opt_options) {
+    var esriJSONFeature =
+    /** @type {EsriJSONFeature} */
+    object;
+    var geometry = readGeometry(esriJSONFeature.geometry, opt_options);
+    var feature = new _Feature.default();
+
+    if (this.geometryName_) {
+      feature.setGeometryName(this.geometryName_);
+    }
+
+    feature.setGeometry(geometry);
+
+    if (opt_options && opt_options.idField && esriJSONFeature.attributes[opt_options.idField]) {
+      feature.setId(
+      /** @type {number} */
+      esriJSONFeature.attributes[opt_options.idField]);
+    }
+
+    if (esriJSONFeature.attributes) {
+      feature.setProperties(esriJSONFeature.attributes);
+    }
+
+    return feature;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  EsriJSON.prototype.readFeaturesFromObject = function readFeaturesFromObject(object, opt_options) {
+    var options = opt_options ? opt_options : {};
+
+    if (object['features']) {
+      var esriJSONFeatureSet =
+      /** @type {EsriJSONFeatureSet} */
+      object;
+      /** @type {Array<import("../Feature.js").default>} */
+
+      var features = [];
+      var esriJSONFeatures = esriJSONFeatureSet.features;
+      options.idField = object.objectIdFieldName;
+
+      for (var i = 0, ii = esriJSONFeatures.length; i < ii; ++i) {
+        features.push(this.readFeatureFromObject(esriJSONFeatures[i], options));
+      }
+
+      return features;
+    } else {
+      return [this.readFeatureFromObject(object, options)];
+    }
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  EsriJSON.prototype.readGeometryFromObject = function readGeometryFromObject(object, opt_options) {
+    return readGeometry(
+    /** @type {EsriJSONGeometry} */
+    object, opt_options);
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  EsriJSON.prototype.readProjectionFromObject = function readProjectionFromObject(object) {
+    if (object['spatialReference'] && object['spatialReference']['wkid'] !== undefined) {
+      var spatialReference =
+      /** @type {EsriJSONSpatialReferenceWkid} */
+      object['spatialReference'];
+      var crs = spatialReference.wkid;
+      return (0, _proj.get)('EPSG:' + crs);
+    } else {
+      return null;
+    }
+  };
+  /**
+   * Encode a geometry as a EsriJSON object.
+   *
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {EsriJSONGeometry} Object.
+   * @override
+   * @api
+   */
+
+
+  EsriJSON.prototype.writeGeometryObject = function writeGeometryObject(geometry, opt_options) {
+    return writeGeometry(geometry, this.adaptOptions(opt_options));
+  };
+  /**
+   * Encode a feature as a esriJSON Feature object.
+   *
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {Object} Object.
+   * @override
+   * @api
+   */
+
+
+  EsriJSON.prototype.writeFeatureObject = function writeFeatureObject(feature, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    var object = {};
+    var geometry = feature.getGeometry();
+
+    if (geometry) {
+      object['geometry'] = writeGeometry(geometry, opt_options);
+
+      if (opt_options && opt_options.featureProjection) {
+        object['geometry']['spatialReference'] =
+        /** @type {EsriJSONSpatialReferenceWkid} */
+        {
+          wkid: Number((0, _proj.get)(opt_options.featureProjection).getCode().split(':').pop())
+        };
+      }
+    }
+
+    var properties = feature.getProperties();
+    delete properties[feature.getGeometryName()];
+
+    if (!(0, _obj.isEmpty)(properties)) {
+      object['attributes'] = properties;
+    } else {
+      object['attributes'] = {};
+    }
+
+    return object;
+  };
+  /**
+   * Encode an array of features as a EsriJSON object.
+   *
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {Object} EsriJSON Object.
+   * @override
+   * @api
+   */
+
+
+  EsriJSON.prototype.writeFeaturesObject = function writeFeaturesObject(features, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    var objects = [];
+
+    for (var i = 0, ii = features.length; i < ii; ++i) {
+      objects.push(this.writeFeatureObject(features[i], opt_options));
+    }
+
+    return (
+      /** @type {EsriJSONFeatureSet} */
+      {
+        'features': objects
+      }
+    );
+  };
+
+  return EsriJSON;
+}(_JSONFeature.default);
+/**
+ * @param {EsriJSONGeometry} object Object.
+ * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+ * @return {import("../geom/Geometry.js").default} Geometry.
+ */
+
+
+function readGeometry(object, opt_options) {
+  if (!object) {
+    return null;
+  }
+  /** @type {import("../geom/GeometryType.js").default} */
+
+
+  var type;
+
+  if (typeof object['x'] === 'number' && typeof object['y'] === 'number') {
+    type = _GeometryType.default.POINT;
+  } else if (object['points']) {
+    type = _GeometryType.default.MULTI_POINT;
+  } else if (object['paths']) {
+    var esriJSONPolyline =
+    /** @type {EsriJSONPolyline} */
+    object;
+
+    if (esriJSONPolyline.paths.length === 1) {
+      type = _GeometryType.default.LINE_STRING;
+    } else {
+      type = _GeometryType.default.MULTI_LINE_STRING;
+    }
+  } else if (object['rings']) {
+    var esriJSONPolygon =
+    /** @type {EsriJSONPolygon} */
+    object;
+    var layout = getGeometryLayout(esriJSONPolygon);
+    var rings = convertRings(esriJSONPolygon.rings, layout);
+
+    if (rings.length === 1) {
+      type = _GeometryType.default.POLYGON;
+      object['rings'] = rings[0];
+    } else {
+      type = _GeometryType.default.MULTI_POLYGON;
+      object['rings'] = rings;
+    }
+  }
+
+  var geometryReader = GEOMETRY_READERS[type];
+  return (
+    /** @type {import("../geom/Geometry.js").default} */
+    (0, _Feature2.transformWithOptions)(geometryReader(object), false, opt_options)
+  );
+}
+/**
+ * Determines inner and outer rings.
+ * Checks if any polygons in this array contain any other polygons in this
+ * array. It is used for checking for holes.
+ * Logic inspired by: https://github.com/Esri/terraformer-arcgis-parser
+ * @param {Array<!Array<!Array<number>>>} rings Rings.
+ * @param {import("../geom/GeometryLayout.js").default} layout Geometry layout.
+ * @return {Array<!Array<!Array<!Array<number>>>>} Transformed rings.
+ */
+
+
+function convertRings(rings, layout) {
+  var flatRing = [];
+  var outerRings = [];
+  var holes = [];
+  var i, ii;
+
+  for (i = 0, ii = rings.length; i < ii; ++i) {
+    flatRing.length = 0;
+    (0, _deflate.deflateCoordinates)(flatRing, 0, rings[i], layout.length); // is this ring an outer ring? is it clockwise?
+
+    var clockwise = (0, _orient.linearRingIsClockwise)(flatRing, 0, flatRing.length, layout.length);
+
+    if (clockwise) {
+      outerRings.push([rings[i]]);
+    } else {
+      holes.push(rings[i]);
+    }
+  }
+
+  while (holes.length) {
+    var hole = holes.shift();
+    var matched = false; // loop over all outer rings and see if they contain our hole.
+
+    for (i = outerRings.length - 1; i >= 0; i--) {
+      var outerRing = outerRings[i][0];
+      var containsHole = (0, _extent.containsExtent)(new _LinearRing.default(outerRing).getExtent(), new _LinearRing.default(hole).getExtent());
+
+      if (containsHole) {
+        // the hole is contained push it into our polygon
+        outerRings[i].push(hole);
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched) {
+      // no outer rings contain this hole turn it into and outer
+      // ring (reverse it)
+      outerRings.push([hole.reverse()]);
+    }
+  }
+
+  return outerRings;
+}
+/**
+ * @param {EsriJSONPoint} object Object.
+ * @return {import("../geom/Geometry.js").default} Point.
+ */
+
+
+function readPointGeometry(object) {
+  var point;
+
+  if (object.m !== undefined && object.z !== undefined) {
+    point = new _Point.default([object.x, object.y, object.z, object.m], _GeometryLayout.default.XYZM);
+  } else if (object.z !== undefined) {
+    point = new _Point.default([object.x, object.y, object.z], _GeometryLayout.default.XYZ);
+  } else if (object.m !== undefined) {
+    point = new _Point.default([object.x, object.y, object.m], _GeometryLayout.default.XYM);
+  } else {
+    point = new _Point.default([object.x, object.y]);
+  }
+
+  return point;
+}
+/**
+ * @param {EsriJSONPolyline} object Object.
+ * @return {import("../geom/Geometry.js").default} LineString.
+ */
+
+
+function readLineStringGeometry(object) {
+  var layout = getGeometryLayout(object);
+  return new _LineString.default(object.paths[0], layout);
+}
+/**
+ * @param {EsriJSONPolyline} object Object.
+ * @return {import("../geom/Geometry.js").default} MultiLineString.
+ */
+
+
+function readMultiLineStringGeometry(object) {
+  var layout = getGeometryLayout(object);
+  return new _MultiLineString.default(object.paths, layout);
+}
+/**
+ * @param {EsriJSONHasZM} object Object.
+ * @return {import("../geom/GeometryLayout.js").default} The geometry layout to use.
+ */
+
+
+function getGeometryLayout(object) {
+  var layout = _GeometryLayout.default.XY;
+
+  if (object.hasZ === true && object.hasM === true) {
+    layout = _GeometryLayout.default.XYZM;
+  } else if (object.hasZ === true) {
+    layout = _GeometryLayout.default.XYZ;
+  } else if (object.hasM === true) {
+    layout = _GeometryLayout.default.XYM;
+  }
+
+  return layout;
+}
+/**
+ * @param {EsriJSONMultipoint} object Object.
+ * @return {import("../geom/Geometry.js").default} MultiPoint.
+ */
+
+
+function readMultiPointGeometry(object) {
+  var layout = getGeometryLayout(object);
+  return new _MultiPoint.default(object.points, layout);
+}
+/**
+ * @param {EsriJSONMultiPolygon} object Object.
+ * @return {import("../geom/Geometry.js").default} MultiPolygon.
+ */
+
+
+function readMultiPolygonGeometry(object) {
+  var layout = getGeometryLayout(object);
+  return new _MultiPolygon.default(object.rings, layout);
+}
+/**
+ * @param {EsriJSONPolygon} object Object.
+ * @return {import("../geom/Geometry.js").default} Polygon.
+ */
+
+
+function readPolygonGeometry(object) {
+  var layout = getGeometryLayout(object);
+  return new _Polygon.default(object.rings, layout);
+}
+/**
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {EsriJSONGeometry} EsriJSON geometry.
+ */
+
+
+function writePointGeometry(geometry, opt_options) {
+  var coordinates =
+  /** @type {import("../geom/Point.js").default} */
+  geometry.getCoordinates();
+  var esriJSON;
+  var layout =
+  /** @type {import("../geom/Point.js").default} */
+  geometry.getLayout();
+
+  if (layout === _GeometryLayout.default.XYZ) {
+    esriJSON =
+    /** @type {EsriJSONPoint} */
+    {
+      x: coordinates[0],
+      y: coordinates[1],
+      z: coordinates[2]
+    };
+  } else if (layout === _GeometryLayout.default.XYM) {
+    esriJSON =
+    /** @type {EsriJSONPoint} */
+    {
+      x: coordinates[0],
+      y: coordinates[1],
+      m: coordinates[2]
+    };
+  } else if (layout === _GeometryLayout.default.XYZM) {
+    esriJSON =
+    /** @type {EsriJSONPoint} */
+    {
+      x: coordinates[0],
+      y: coordinates[1],
+      z: coordinates[2],
+      m: coordinates[3]
+    };
+  } else if (layout === _GeometryLayout.default.XY) {
+    esriJSON =
+    /** @type {EsriJSONPoint} */
+    {
+      x: coordinates[0],
+      y: coordinates[1]
+    };
+  } else {
+    (0, _asserts.assert)(false, 34); // Invalid geometry layout
+  }
+
+  return (
+    /** @type {EsriJSONGeometry} */
+    esriJSON
+  );
+}
+/**
+ * @param {import("../geom/SimpleGeometry.js").default} geometry Geometry.
+ * @return {Object} Object with boolean hasZ and hasM keys.
+ */
+
+
+function getHasZM(geometry) {
+  var layout = geometry.getLayout();
+  return {
+    hasZ: layout === _GeometryLayout.default.XYZ || layout === _GeometryLayout.default.XYZM,
+    hasM: layout === _GeometryLayout.default.XYM || layout === _GeometryLayout.default.XYZM
+  };
+}
+/**
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {EsriJSONPolyline} EsriJSON geometry.
+ */
+
+
+function writeLineStringGeometry(geometry, opt_options) {
+  var lineString =
+  /** @type {import("../geom/LineString.js").default} */
+  geometry;
+  var hasZM = getHasZM(lineString);
+  return (
+    /** @type {EsriJSONPolyline} */
+    {
+      hasZ: hasZM.hasZ,
+      hasM: hasZM.hasM,
+      paths: [
+      /** @type {Array<EsriJSONPosition>} */
+      lineString.getCoordinates()]
+    }
+  );
+}
+/**
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {EsriJSONPolygon} EsriJSON geometry.
+ */
+
+
+function writePolygonGeometry(geometry, opt_options) {
+  var polygon =
+  /** @type {import("../geom/Polygon.js").default} */
+  geometry; // Esri geometries use the left-hand rule
+
+  var hasZM = getHasZM(polygon);
+  return (
+    /** @type {EsriJSONPolygon} */
+    {
+      hasZ: hasZM.hasZ,
+      hasM: hasZM.hasM,
+      rings:
+      /** @type {Array<Array<EsriJSONPosition>>} */
+      polygon.getCoordinates(false)
+    }
+  );
+}
+/**
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {EsriJSONPolyline} EsriJSON geometry.
+ */
+
+
+function writeMultiLineStringGeometry(geometry, opt_options) {
+  var multiLineString =
+  /** @type {import("../geom/MultiLineString.js").default} */
+  geometry;
+  var hasZM = getHasZM(multiLineString);
+  return (
+    /** @type {EsriJSONPolyline} */
+    {
+      hasZ: hasZM.hasZ,
+      hasM: hasZM.hasM,
+      paths:
+      /** @type {Array<Array<EsriJSONPosition>>} */
+      multiLineString.getCoordinates()
+    }
+  );
+}
+/**
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {EsriJSONMultipoint} EsriJSON geometry.
+ */
+
+
+function writeMultiPointGeometry(geometry, opt_options) {
+  var multiPoint =
+  /** @type {import("../geom/MultiPoint.js").default} */
+  geometry;
+  var hasZM = getHasZM(multiPoint);
+  return (
+    /** @type {EsriJSONMultipoint} */
+    {
+      hasZ: hasZM.hasZ,
+      hasM: hasZM.hasM,
+      points:
+      /** @type {Array<EsriJSONPosition>} */
+      multiPoint.getCoordinates()
+    }
+  );
+}
+/**
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {EsriJSONPolygon} EsriJSON geometry.
+ */
+
+
+function writeMultiPolygonGeometry(geometry, opt_options) {
+  var hasZM = getHasZM(
+  /** @type {import("../geom/MultiPolygon.js").default} */
+  geometry);
+  var coordinates =
+  /** @type {import("../geom/MultiPolygon.js").default} */
+  geometry.getCoordinates(false);
+  var output = [];
+
+  for (var i = 0; i < coordinates.length; i++) {
+    for (var x = coordinates[i].length - 1; x >= 0; x--) {
+      output.push(coordinates[i][x]);
+    }
+  }
+
+  return (
+    /** @type {EsriJSONPolygon} */
+    {
+      hasZ: hasZM.hasZ,
+      hasM: hasZM.hasM,
+      rings: output
+    }
+  );
+}
+/**
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {EsriJSONGeometry} EsriJSON geometry.
+ */
+
+
+function writeGeometry(geometry, opt_options) {
+  var geometryWriter = GEOMETRY_WRITERS[geometry.getType()];
+  return geometryWriter(
+  /** @type {import("../geom/Geometry.js").default} */
+  (0, _Feature2.transformWithOptions)(geometry, true, opt_options), opt_options);
+}
+
+var _default = EsriJSON;
+exports.default = _default;
+},{"../Feature.js":"../node_modules/ol/Feature.js","../asserts.js":"../node_modules/ol/asserts.js","../extent.js":"../node_modules/ol/extent.js","./Feature.js":"../node_modules/ol/format/Feature.js","./JSONFeature.js":"../node_modules/ol/format/JSONFeature.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/GeometryType.js":"../node_modules/ol/geom/GeometryType.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/LinearRing.js":"../node_modules/ol/geom/LinearRing.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/MultiPoint.js":"../node_modules/ol/geom/MultiPoint.js","../geom/MultiPolygon.js":"../node_modules/ol/geom/MultiPolygon.js","../geom/Point.js":"../node_modules/ol/geom/Point.js","../geom/Polygon.js":"../node_modules/ol/geom/Polygon.js","../geom/flat/deflate.js":"../node_modules/ol/geom/flat/deflate.js","../geom/flat/orient.js":"../node_modules/ol/geom/flat/orient.js","../obj.js":"../node_modules/ol/obj.js","../proj.js":"../node_modules/ol/proj.js"}],"../node_modules/ol/geom/GeometryCollection.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _events = require("../events.js");
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _extent = require("../extent.js");
+
+var _Geometry = _interopRequireDefault(require("./Geometry.js"));
+
+var _GeometryType = _interopRequireDefault(require("./GeometryType.js"));
+
+var _obj = require("../obj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/geom/GeometryCollection
+ */
+
+/**
+ * @classdesc
+ * An array of {@link module:ol/geom/Geometry} objects.
+ *
+ * @api
+ */
+var GeometryCollection =
+/*@__PURE__*/
+function (Geometry) {
+  function GeometryCollection(opt_geometries) {
+    Geometry.call(this);
+    /**
+     * @private
+     * @type {Array<Geometry>}
+     */
+
+    this.geometries_ = opt_geometries ? opt_geometries : null;
+    this.listenGeometriesChange_();
+  }
+
+  if (Geometry) GeometryCollection.__proto__ = Geometry;
+  GeometryCollection.prototype = Object.create(Geometry && Geometry.prototype);
+  GeometryCollection.prototype.constructor = GeometryCollection;
+  /**
+   * @private
+   */
+
+  GeometryCollection.prototype.unlistenGeometriesChange_ = function unlistenGeometriesChange_() {
+    if (!this.geometries_) {
+      return;
+    }
+
+    for (var i = 0, ii = this.geometries_.length; i < ii; ++i) {
+      (0, _events.unlisten)(this.geometries_[i], _EventType.default.CHANGE, this.changed, this);
+    }
+  };
+  /**
+   * @private
+   */
+
+
+  GeometryCollection.prototype.listenGeometriesChange_ = function listenGeometriesChange_() {
+    if (!this.geometries_) {
+      return;
+    }
+
+    for (var i = 0, ii = this.geometries_.length; i < ii; ++i) {
+      (0, _events.listen)(this.geometries_[i], _EventType.default.CHANGE, this.changed, this);
+    }
+  };
+  /**
+   * Make a complete copy of the geometry.
+   * @return {!GeometryCollection} Clone.
+   * @override
+   * @api
+   */
+
+
+  GeometryCollection.prototype.clone = function clone() {
+    var geometryCollection = new GeometryCollection(null);
+    geometryCollection.setGeometries(this.geometries_);
+    return geometryCollection;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GeometryCollection.prototype.closestPointXY = function closestPointXY(x, y, closestPoint, minSquaredDistance) {
+    if (minSquaredDistance < (0, _extent.closestSquaredDistanceXY)(this.getExtent(), x, y)) {
+      return minSquaredDistance;
+    }
+
+    var geometries = this.geometries_;
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      minSquaredDistance = geometries[i].closestPointXY(x, y, closestPoint, minSquaredDistance);
+    }
+
+    return minSquaredDistance;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GeometryCollection.prototype.containsXY = function containsXY(x, y) {
+    var geometries = this.geometries_;
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      if (geometries[i].containsXY(x, y)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GeometryCollection.prototype.computeExtent = function computeExtent(extent) {
+    (0, _extent.createOrUpdateEmpty)(extent);
+    var geometries = this.geometries_;
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      (0, _extent.extend)(extent, geometries[i].getExtent());
+    }
+
+    return extent;
+  };
+  /**
+   * Return the geometries that make up this geometry collection.
+   * @return {Array<Geometry>} Geometries.
+   * @api
+   */
+
+
+  GeometryCollection.prototype.getGeometries = function getGeometries() {
+    return cloneGeometries(this.geometries_);
+  };
+  /**
+   * @return {Array<Geometry>} Geometries.
+   */
+
+
+  GeometryCollection.prototype.getGeometriesArray = function getGeometriesArray() {
+    return this.geometries_;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GeometryCollection.prototype.getSimplifiedGeometry = function getSimplifiedGeometry(squaredTolerance) {
+    if (this.simplifiedGeometryRevision != this.getRevision()) {
+      (0, _obj.clear)(this.simplifiedGeometryCache);
+      this.simplifiedGeometryMaxMinSquaredTolerance = 0;
+      this.simplifiedGeometryRevision = this.getRevision();
+    }
+
+    if (squaredTolerance < 0 || this.simplifiedGeometryMaxMinSquaredTolerance !== 0 && squaredTolerance < this.simplifiedGeometryMaxMinSquaredTolerance) {
+      return this;
+    }
+
+    var key = squaredTolerance.toString();
+
+    if (this.simplifiedGeometryCache.hasOwnProperty(key)) {
+      return this.simplifiedGeometryCache[key];
+    } else {
+      var simplifiedGeometries = [];
+      var geometries = this.geometries_;
+      var simplified = false;
+
+      for (var i = 0, ii = geometries.length; i < ii; ++i) {
+        var geometry = geometries[i];
+        var simplifiedGeometry = geometry.getSimplifiedGeometry(squaredTolerance);
+        simplifiedGeometries.push(simplifiedGeometry);
+
+        if (simplifiedGeometry !== geometry) {
+          simplified = true;
+        }
+      }
+
+      if (simplified) {
+        var simplifiedGeometryCollection = new GeometryCollection(null);
+        simplifiedGeometryCollection.setGeometriesArray(simplifiedGeometries);
+        this.simplifiedGeometryCache[key] = simplifiedGeometryCollection;
+        return simplifiedGeometryCollection;
+      } else {
+        this.simplifiedGeometryMaxMinSquaredTolerance = squaredTolerance;
+        return this;
+      }
+    }
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  GeometryCollection.prototype.getType = function getType() {
+    return _GeometryType.default.GEOMETRY_COLLECTION;
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  GeometryCollection.prototype.intersectsExtent = function intersectsExtent(extent) {
+    var geometries = this.geometries_;
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      if (geometries[i].intersectsExtent(extent)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+  /**
+   * @return {boolean} Is empty.
+   */
+
+
+  GeometryCollection.prototype.isEmpty = function isEmpty() {
+    return this.geometries_.length === 0;
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  GeometryCollection.prototype.rotate = function rotate(angle, anchor) {
+    var geometries = this.geometries_;
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      geometries[i].rotate(angle, anchor);
+    }
+
+    this.changed();
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  GeometryCollection.prototype.scale = function scale(sx, opt_sy, opt_anchor) {
+    var anchor = opt_anchor;
+
+    if (!anchor) {
+      anchor = (0, _extent.getCenter)(this.getExtent());
+    }
+
+    var geometries = this.geometries_;
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      geometries[i].scale(sx, opt_sy, anchor);
+    }
+
+    this.changed();
+  };
+  /**
+   * Set the geometries that make up this geometry collection.
+   * @param {Array<Geometry>} geometries Geometries.
+   * @api
+   */
+
+
+  GeometryCollection.prototype.setGeometries = function setGeometries(geometries) {
+    this.setGeometriesArray(cloneGeometries(geometries));
+  };
+  /**
+   * @param {Array<Geometry>} geometries Geometries.
+   */
+
+
+  GeometryCollection.prototype.setGeometriesArray = function setGeometriesArray(geometries) {
+    this.unlistenGeometriesChange_();
+    this.geometries_ = geometries;
+    this.listenGeometriesChange_();
+    this.changed();
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  GeometryCollection.prototype.applyTransform = function applyTransform(transformFn) {
+    var geometries = this.geometries_;
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      geometries[i].applyTransform(transformFn);
+    }
+
+    this.changed();
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  GeometryCollection.prototype.translate = function translate(deltaX, deltaY) {
+    var geometries = this.geometries_;
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      geometries[i].translate(deltaX, deltaY);
+    }
+
+    this.changed();
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GeometryCollection.prototype.disposeInternal = function disposeInternal() {
+    this.unlistenGeometriesChange_();
+    Geometry.prototype.disposeInternal.call(this);
+  };
+
+  return GeometryCollection;
+}(_Geometry.default);
+/**
+ * @param {Array<Geometry>} geometries Geometries.
+ * @return {Array<Geometry>} Cloned geometries.
+ */
+
+
+function cloneGeometries(geometries) {
+  var clonedGeometries = [];
+
+  for (var i = 0, ii = geometries.length; i < ii; ++i) {
+    clonedGeometries.push(geometries[i].clone());
+  }
+
+  return clonedGeometries;
+}
+
+var _default = GeometryCollection;
+exports.default = _default;
+},{"../events.js":"../node_modules/ol/events.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","../extent.js":"../node_modules/ol/extent.js","./Geometry.js":"../node_modules/ol/geom/Geometry.js","./GeometryType.js":"../node_modules/ol/geom/GeometryType.js","../obj.js":"../node_modules/ol/obj.js"}],"../node_modules/ol/format/GeoJSON.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _asserts = require("../asserts.js");
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _Feature2 = require("./Feature.js");
+
+var _JSONFeature = _interopRequireDefault(require("./JSONFeature.js"));
+
+var _GeometryCollection = _interopRequireDefault(require("../geom/GeometryCollection.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _MultiPoint = _interopRequireDefault(require("../geom/MultiPoint.js"));
+
+var _MultiPolygon = _interopRequireDefault(require("../geom/MultiPolygon.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _Polygon = _interopRequireDefault(require("../geom/Polygon.js"));
+
+var _obj = require("../obj.js");
+
+var _proj = require("../proj.js");
+
+var _GeometryType = _interopRequireDefault(require("../geom/GeometryType.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/GeoJSON
+ */
+
+/**
+ * @typedef {import("geojson").GeoJSON} GeoJSONObject
+ * @typedef {import("geojson").Feature} GeoJSONFeature
+ * @typedef {import("geojson").FeatureCollection} GeoJSONFeatureCollection
+ * @typedef {import("geojson").Geometry} GeoJSONGeometry
+ * @typedef {import("geojson").Point} GeoJSONPoint
+ * @typedef {import("geojson").LineString} GeoJSONLineString
+ * @typedef {import("geojson").Polygon} GeoJSONPolygon
+ * @typedef {import("geojson").MultiPoint} GeoJSONMultiPoint
+ * @typedef {import("geojson").MultiLineString} GeoJSONMultiLineString
+ * @typedef {import("geojson").MultiPolygon} GeoJSONMultiPolygon
+ * @typedef {import("geojson").GeometryCollection} GeoJSONGeometryCollection
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {import("../proj.js").ProjectionLike} [dataProjection='EPSG:4326'] Default data projection.
+ * @property {import("../proj.js").ProjectionLike} [featureProjection] Projection for features read or
+ * written by the format.  Options passed to read or write methods will take precedence.
+ * @property {string} [geometryName] Geometry name to use when creating features.
+ * @property {boolean} [extractGeometryName=false] Certain GeoJSON providers include
+ * the geometry_name field in the feature GeoJSON. If set to `true` the GeoJSON reader
+ * will look for that field to set the geometry name. If both this field is set to `true`
+ * and a `geometryName` is provided, the `geometryName` will take precedence.
+ */
+
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the GeoJSON format.
+ *
+  * @api
+ */
+var GeoJSON =
+/*@__PURE__*/
+function (JSONFeature) {
+  function GeoJSON(opt_options) {
+    var options = opt_options ? opt_options : {};
+    JSONFeature.call(this);
+    /**
+     * @inheritDoc
+     */
+
+    this.dataProjection = (0, _proj.get)(options.dataProjection ? options.dataProjection : 'EPSG:4326');
+
+    if (options.featureProjection) {
+      this.defaultFeatureProjection = (0, _proj.get)(options.featureProjection);
+    }
+    /**
+     * Name of the geometry attribute for features.
+     * @type {string|undefined}
+     * @private
+     */
+
+
+    this.geometryName_ = options.geometryName;
+    /**
+     * Look for the geometry name in the feature GeoJSON
+     * @type {boolean|undefined}
+     * @private
+     */
+
+    this.extractGeometryName_ = options.extractGeometryName;
+  }
+
+  if (JSONFeature) GeoJSON.__proto__ = JSONFeature;
+  GeoJSON.prototype = Object.create(JSONFeature && JSONFeature.prototype);
+  GeoJSON.prototype.constructor = GeoJSON;
+  /**
+   * @inheritDoc
+   */
+
+  GeoJSON.prototype.readFeatureFromObject = function readFeatureFromObject(object, opt_options) {
+    /**
+     * @type {GeoJSONFeature}
+     */
+    var geoJSONFeature = null;
+
+    if (object['type'] === 'Feature') {
+      geoJSONFeature =
+      /** @type {GeoJSONFeature} */
+      object;
+    } else {
+      geoJSONFeature = {
+        'type': 'Feature',
+        'geometry':
+        /** @type {GeoJSONGeometry} */
+        object,
+        'properties': null
+      };
+    }
+
+    var geometry = readGeometry(geoJSONFeature['geometry'], opt_options);
+    var feature = new _Feature.default();
+
+    if (this.geometryName_) {
+      feature.setGeometryName(this.geometryName_);
+    } else if (this.extractGeometryName_ && 'geometry_name' in geoJSONFeature !== undefined) {
+      feature.setGeometryName(geoJSONFeature['geometry_name']);
+    }
+
+    feature.setGeometry(geometry);
+
+    if ('id' in geoJSONFeature) {
+      feature.setId(geoJSONFeature['id']);
+    }
+
+    if (geoJSONFeature['properties']) {
+      feature.setProperties(geoJSONFeature['properties']);
+    }
+
+    return feature;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GeoJSON.prototype.readFeaturesFromObject = function readFeaturesFromObject(object, opt_options) {
+    var geoJSONObject =
+    /** @type {GeoJSONObject} */
+    object;
+    /** @type {Array<import("../Feature.js").default>} */
+
+    var features = null;
+
+    if (geoJSONObject['type'] === 'FeatureCollection') {
+      var geoJSONFeatureCollection =
+      /** @type {GeoJSONFeatureCollection} */
+      object;
+      features = [];
+      var geoJSONFeatures = geoJSONFeatureCollection['features'];
+
+      for (var i = 0, ii = geoJSONFeatures.length; i < ii; ++i) {
+        features.push(this.readFeatureFromObject(geoJSONFeatures[i], opt_options));
+      }
+    } else {
+      features = [this.readFeatureFromObject(object, opt_options)];
+    }
+
+    return features;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GeoJSON.prototype.readGeometryFromObject = function readGeometryFromObject(object, opt_options) {
+    return readGeometry(
+    /** @type {GeoJSONGeometry} */
+    object, opt_options);
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GeoJSON.prototype.readProjectionFromObject = function readProjectionFromObject(object) {
+    var crs = object['crs'];
+    var projection;
+
+    if (crs) {
+      if (crs['type'] == 'name') {
+        projection = (0, _proj.get)(crs['properties']['name']);
+      } else {
+        (0, _asserts.assert)(false, 36); // Unknown SRS type
+      }
+    } else {
+      projection = this.dataProjection;
+    }
+
+    return (
+      /** @type {import("../proj/Projection.js").default} */
+      projection
+    );
+  };
+  /**
+   * Encode a feature as a GeoJSON Feature object.
+   *
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {GeoJSONFeature} Object.
+   * @override
+   * @api
+   */
+
+
+  GeoJSON.prototype.writeFeatureObject = function writeFeatureObject(feature, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    /** @type {GeoJSONFeature} */
+
+    var object = {
+      'type': 'Feature',
+      geometry: null,
+      properties: null
+    };
+    var id = feature.getId();
+
+    if (id !== undefined) {
+      object.id = id;
+    }
+
+    var geometry = feature.getGeometry();
+
+    if (geometry) {
+      object.geometry = writeGeometry(geometry, opt_options);
+    }
+
+    var properties = feature.getProperties();
+    delete properties[feature.getGeometryName()];
+
+    if (!(0, _obj.isEmpty)(properties)) {
+      object.properties = properties;
+    }
+
+    return object;
+  };
+  /**
+   * Encode an array of features as a GeoJSON object.
+   *
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {GeoJSONFeatureCollection} GeoJSON Object.
+   * @override
+   * @api
+   */
+
+
+  GeoJSON.prototype.writeFeaturesObject = function writeFeaturesObject(features, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    var objects = [];
+
+    for (var i = 0, ii = features.length; i < ii; ++i) {
+      objects.push(this.writeFeatureObject(features[i], opt_options));
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features: objects
+    };
+  };
+  /**
+   * Encode a geometry as a GeoJSON object.
+   *
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {GeoJSONGeometry|GeoJSONGeometryCollection} Object.
+   * @override
+   * @api
+   */
+
+
+  GeoJSON.prototype.writeGeometryObject = function writeGeometryObject(geometry, opt_options) {
+    return writeGeometry(geometry, this.adaptOptions(opt_options));
+  };
+
+  return GeoJSON;
+}(_JSONFeature.default);
+/**
+ * @param {GeoJSONGeometry|GeoJSONGeometryCollection} object Object.
+ * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+ * @return {import("../geom/Geometry.js").default} Geometry.
+ */
+
+
+function readGeometry(object, opt_options) {
+  if (!object) {
+    return null;
+  }
+  /**
+   * @type {import("../geom/Geometry.js").default}
+   */
+
+
+  var geometry;
+
+  switch (object['type']) {
+    case _GeometryType.default.POINT:
+      {
+        geometry = readPointGeometry(
+        /** @type {GeoJSONPoint} */
+        object);
+        break;
+      }
+
+    case _GeometryType.default.LINE_STRING:
+      {
+        geometry = readLineStringGeometry(
+        /** @type {GeoJSONLineString} */
+        object);
+        break;
+      }
+
+    case _GeometryType.default.POLYGON:
+      {
+        geometry = readPolygonGeometry(
+        /** @type {GeoJSONPolygon} */
+        object);
+        break;
+      }
+
+    case _GeometryType.default.MULTI_POINT:
+      {
+        geometry = readMultiPointGeometry(
+        /** @type {GeoJSONMultiPoint} */
+        object);
+        break;
+      }
+
+    case _GeometryType.default.MULTI_LINE_STRING:
+      {
+        geometry = readMultiLineStringGeometry(
+        /** @type {GeoJSONMultiLineString} */
+        object);
+        break;
+      }
+
+    case _GeometryType.default.MULTI_POLYGON:
+      {
+        geometry = readMultiPolygonGeometry(
+        /** @type {GeoJSONMultiPolygon} */
+        object);
+        break;
+      }
+
+    case _GeometryType.default.GEOMETRY_COLLECTION:
+      {
+        geometry = readGeometryCollectionGeometry(
+        /** @type {GeoJSONGeometryCollection} */
+        object);
+        break;
+      }
+
+    default:
+      {
+        throw new Error('Unsupported GeoJSON type: ' + object.type);
+      }
+  }
+
+  return (
+    /** @type {import("../geom/Geometry.js").default} */
+    (0, _Feature2.transformWithOptions)(geometry, false, opt_options)
+  );
+}
+/**
+ * @param {GeoJSONGeometryCollection} object Object.
+ * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+ * @return {GeometryCollection} Geometry collection.
+ */
+
+
+function readGeometryCollectionGeometry(object, opt_options) {
+  var geometries = object['geometries'].map(
+  /**
+   * @param {GeoJSONGeometry} geometry Geometry.
+   * @return {import("../geom/Geometry.js").default} geometry Geometry.
+   */
+  function (geometry) {
+    return readGeometry(geometry, opt_options);
+  });
+  return new _GeometryCollection.default(geometries);
+}
+/**
+ * @param {GeoJSONPoint} object Object.
+ * @return {Point} Point.
+ */
+
+
+function readPointGeometry(object) {
+  return new _Point.default(object['coordinates']);
+}
+/**
+ * @param {GeoJSONLineString} object Object.
+ * @return {LineString} LineString.
+ */
+
+
+function readLineStringGeometry(object) {
+  return new _LineString.default(object['coordinates']);
+}
+/**
+ * @param {GeoJSONMultiLineString} object Object.
+ * @return {MultiLineString} MultiLineString.
+ */
+
+
+function readMultiLineStringGeometry(object) {
+  return new _MultiLineString.default(object['coordinates']);
+}
+/**
+ * @param {GeoJSONMultiPoint} object Object.
+ * @return {MultiPoint} MultiPoint.
+ */
+
+
+function readMultiPointGeometry(object) {
+  return new _MultiPoint.default(object['coordinates']);
+}
+/**
+ * @param {GeoJSONMultiPolygon} object Object.
+ * @return {MultiPolygon} MultiPolygon.
+ */
+
+
+function readMultiPolygonGeometry(object) {
+  return new _MultiPolygon.default(object['coordinates']);
+}
+/**
+ * @param {GeoJSONPolygon} object Object.
+ * @return {Polygon} Polygon.
+ */
+
+
+function readPolygonGeometry(object) {
+  return new _Polygon.default(object['coordinates']);
+}
+/**
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {GeoJSONGeometry} GeoJSON geometry.
+ */
+
+
+function writeGeometry(geometry, opt_options) {
+  geometry =
+  /** @type {import("../geom/Geometry.js").default} */
+  (0, _Feature2.transformWithOptions)(geometry, true, opt_options);
+  var type = geometry.getType();
+  /** @type {GeoJSONGeometry} */
+
+  var geoJSON;
+
+  switch (type) {
+    case _GeometryType.default.POINT:
+      {
+        geoJSON = writePointGeometry(
+        /** @type {Point} */
+        geometry, opt_options);
+        break;
+      }
+
+    case _GeometryType.default.LINE_STRING:
+      {
+        geoJSON = writeLineStringGeometry(
+        /** @type {LineString} */
+        geometry, opt_options);
+        break;
+      }
+
+    case _GeometryType.default.POLYGON:
+      {
+        geoJSON = writePolygonGeometry(
+        /** @type {Polygon} */
+        geometry, opt_options);
+        break;
+      }
+
+    case _GeometryType.default.MULTI_POINT:
+      {
+        geoJSON = writeMultiPointGeometry(
+        /** @type {MultiPoint} */
+        geometry, opt_options);
+        break;
+      }
+
+    case _GeometryType.default.MULTI_LINE_STRING:
+      {
+        geoJSON = writeMultiLineStringGeometry(
+        /** @type {MultiLineString} */
+        geometry, opt_options);
+        break;
+      }
+
+    case _GeometryType.default.MULTI_POLYGON:
+      {
+        geoJSON = writeMultiPolygonGeometry(
+        /** @type {MultiPolygon} */
+        geometry, opt_options);
+        break;
+      }
+
+    case _GeometryType.default.GEOMETRY_COLLECTION:
+      {
+        geoJSON = writeGeometryCollectionGeometry(
+        /** @type {GeometryCollection} */
+        geometry, opt_options);
+        break;
+      }
+
+    case _GeometryType.default.CIRCLE:
+      {
+        geoJSON = {
+          type: 'GeometryCollection',
+          geometries: []
+        };
+        break;
+      }
+
+    default:
+      {
+        throw new Error('Unsupported geometry type: ' + type);
+      }
+  }
+
+  return geoJSON;
+}
+/**
+ * @param {GeometryCollection} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {GeoJSONGeometryCollection} GeoJSON geometry collection.
+ */
+
+
+function writeGeometryCollectionGeometry(geometry, opt_options) {
+  var geometries = geometry.getGeometriesArray().map(function (geometry) {
+    var options = (0, _obj.assign)({}, opt_options);
+    delete options.featureProjection;
+    return writeGeometry(geometry, options);
+  });
+  return {
+    type: 'GeometryCollection',
+    geometries: geometries
+  };
+}
+/**
+ * @param {LineString} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {GeoJSONGeometry} GeoJSON geometry.
+ */
+
+
+function writeLineStringGeometry(geometry, opt_options) {
+  return {
+    type: 'LineString',
+    coordinates: geometry.getCoordinates()
+  };
+}
+/**
+ * @param {MultiLineString} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {GeoJSONGeometry} GeoJSON geometry.
+ */
+
+
+function writeMultiLineStringGeometry(geometry, opt_options) {
+  return {
+    type: 'MultiLineString',
+    coordinates: geometry.getCoordinates()
+  };
+}
+/**
+ * @param {MultiPoint} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {GeoJSONGeometry} GeoJSON geometry.
+ */
+
+
+function writeMultiPointGeometry(geometry, opt_options) {
+  return {
+    type: 'MultiPoint',
+    coordinates: geometry.getCoordinates()
+  };
+}
+/**
+ * @param {MultiPolygon} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {GeoJSONGeometry} GeoJSON geometry.
+ */
+
+
+function writeMultiPolygonGeometry(geometry, opt_options) {
+  var right;
+
+  if (opt_options) {
+    right = opt_options.rightHanded;
+  }
+
+  return {
+    type: 'MultiPolygon',
+    coordinates: geometry.getCoordinates(right)
+  };
+}
+/**
+ * @param {Point} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {GeoJSONGeometry} GeoJSON geometry.
+ */
+
+
+function writePointGeometry(geometry, opt_options) {
+  return {
+    type: 'Point',
+    coordinates: geometry.getCoordinates()
+  };
+}
+/**
+ * @param {Polygon} geometry Geometry.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+ * @return {GeoJSONGeometry} GeoJSON geometry.
+ */
+
+
+function writePolygonGeometry(geometry, opt_options) {
+  var right;
+
+  if (opt_options) {
+    right = opt_options.rightHanded;
+  }
+
+  return {
+    type: 'Polygon',
+    coordinates: geometry.getCoordinates(right)
+  };
+}
+
+var _default = GeoJSON;
+exports.default = _default;
+},{"../asserts.js":"../node_modules/ol/asserts.js","../Feature.js":"../node_modules/ol/Feature.js","./Feature.js":"../node_modules/ol/format/Feature.js","./JSONFeature.js":"../node_modules/ol/format/JSONFeature.js","../geom/GeometryCollection.js":"../node_modules/ol/geom/GeometryCollection.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/MultiPoint.js":"../node_modules/ol/geom/MultiPoint.js","../geom/MultiPolygon.js":"../node_modules/ol/geom/MultiPolygon.js","../geom/Point.js":"../node_modules/ol/geom/Point.js","../geom/Polygon.js":"../node_modules/ol/geom/Polygon.js","../obj.js":"../node_modules/ol/obj.js","../proj.js":"../node_modules/ol/proj.js","../geom/GeometryType.js":"../node_modules/ol/geom/GeometryType.js"}],"../node_modules/ol/xml.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.createElementNS = createElementNS;
+exports.getAllTextContent = getAllTextContent;
+exports.getAllTextContent_ = getAllTextContent_;
+exports.isDocument = isDocument;
+exports.getAttributeNS = getAttributeNS;
+exports.parse = parse;
+exports.makeArrayExtender = makeArrayExtender;
+exports.makeArrayPusher = makeArrayPusher;
+exports.makeReplacer = makeReplacer;
+exports.makeObjectPropertyPusher = makeObjectPropertyPusher;
+exports.makeObjectPropertySetter = makeObjectPropertySetter;
+exports.makeChildAppender = makeChildAppender;
+exports.makeArraySerializer = makeArraySerializer;
+exports.makeSimpleNodeFactory = makeSimpleNodeFactory;
+exports.makeSequence = makeSequence;
+exports.makeStructureNS = makeStructureNS;
+exports.parseNode = parseNode;
+exports.pushParseAndPop = pushParseAndPop;
+exports.serialize = serialize;
+exports.pushSerializeAndPop = pushSerializeAndPop;
+exports.OBJECT_PROPERTY_NODE_FACTORY = exports.XML_SCHEMA_INSTANCE_URI = exports.DOCUMENT = void 0;
+
+var _array = require("./array.js");
+
+/**
+ * @module ol/xml
+ */
+
+/**
+ * When using {@link module:ol/xml~makeChildAppender} or
+ * {@link module:ol/xml~makeSimpleNodeFactory}, the top `objectStack` item needs
+ * to have this structure.
+ * @typedef {Object} NodeStackItem
+ * @property {Node} node
+ */
+
+/**
+ * @typedef {function(Element, Array<*>)} Parser
+ */
+
+/**
+ * @typedef {function(Element, *, Array<*>)} Serializer
+ */
+
+/**
+ * This document should be used when creating nodes for XML serializations. This
+ * document is also used by {@link module:ol/xml~createElementNS}
+ * @const
+ * @type {Document}
+ */
+var DOCUMENT = document.implementation.createDocument('', '', null);
+/**
+ * @type {string}
+ */
+
+exports.DOCUMENT = DOCUMENT;
+var XML_SCHEMA_INSTANCE_URI = 'http://www.w3.org/2001/XMLSchema-instance';
+/**
+ * @param {string} namespaceURI Namespace URI.
+ * @param {string} qualifiedName Qualified name.
+ * @return {Element} Node.
+ */
+
+exports.XML_SCHEMA_INSTANCE_URI = XML_SCHEMA_INSTANCE_URI;
+
+function createElementNS(namespaceURI, qualifiedName) {
+  return DOCUMENT.createElementNS(namespaceURI, qualifiedName);
+}
+/**
+ * Recursively grab all text content of child nodes into a single string.
+ * @param {Node} node Node.
+ * @param {boolean} normalizeWhitespace Normalize whitespace: remove all line
+ * breaks.
+ * @return {string} All text content.
+ * @api
+ */
+
+
+function getAllTextContent(node, normalizeWhitespace) {
+  return getAllTextContent_(node, normalizeWhitespace, []).join('');
+}
+/**
+ * Recursively grab all text content of child nodes into a single string.
+ * @param {Node} node Node.
+ * @param {boolean} normalizeWhitespace Normalize whitespace: remove all line
+ * breaks.
+ * @param {Array<string>} accumulator Accumulator.
+ * @private
+ * @return {Array<string>} Accumulator.
+ */
+
+
+function getAllTextContent_(node, normalizeWhitespace, accumulator) {
+  if (node.nodeType == Node.CDATA_SECTION_NODE || node.nodeType == Node.TEXT_NODE) {
+    if (normalizeWhitespace) {
+      accumulator.push(String(node.nodeValue).replace(/(\r\n|\r|\n)/g, ''));
+    } else {
+      accumulator.push(node.nodeValue);
+    }
+  } else {
+    var n;
+
+    for (n = node.firstChild; n; n = n.nextSibling) {
+      getAllTextContent_(n, normalizeWhitespace, accumulator);
+    }
+  }
+
+  return accumulator;
+}
+/**
+ * @param {Object} object Object.
+ * @return {boolean} Is a document.
+ */
+
+
+function isDocument(object) {
+  return 'documentElement' in object;
+}
+/**
+ * @param {Element} node Node.
+ * @param {?string} namespaceURI Namespace URI.
+ * @param {string} name Attribute name.
+ * @return {string} Value
+ */
+
+
+function getAttributeNS(node, namespaceURI, name) {
+  return node.getAttributeNS(namespaceURI, name) || '';
+}
+/**
+ * Parse an XML string to an XML Document.
+ * @param {string} xml XML.
+ * @return {Document} Document.
+ * @api
+ */
+
+
+function parse(xml) {
+  return new DOMParser().parseFromString(xml, 'application/xml');
+}
+/**
+ * Make an array extender function for extending the array at the top of the
+ * object stack.
+ * @param {function(this: T, Node, Array<*>): (Array<*>|undefined)} valueReader Value reader.
+ * @param {T=} opt_this The object to use as `this` in `valueReader`.
+ * @return {Parser} Parser.
+ * @template T
+ */
+
+
+function makeArrayExtender(valueReader, opt_this) {
+  return (
+    /**
+     * @param {Node} node Node.
+     * @param {Array<*>} objectStack Object stack.
+     */
+    function (node, objectStack) {
+      var value = valueReader.call(opt_this !== undefined ? opt_this : this, node, objectStack);
+
+      if (value !== undefined) {
+        var array =
+        /** @type {Array<*>} */
+        objectStack[objectStack.length - 1];
+        (0, _array.extend)(array, value);
+      }
+    }
+  );
+}
+/**
+ * Make an array pusher function for pushing to the array at the top of the
+ * object stack.
+ * @param {function(this: T, Element, Array<*>): *} valueReader Value reader.
+ * @param {T=} opt_this The object to use as `this` in `valueReader`.
+ * @return {Parser} Parser.
+ * @template T
+ */
+
+
+function makeArrayPusher(valueReader, opt_this) {
+  return (
+    /**
+     * @param {Element} node Node.
+     * @param {Array<*>} objectStack Object stack.
+     */
+    function (node, objectStack) {
+      var value = valueReader.call(opt_this !== undefined ? opt_this : this, node, objectStack);
+
+      if (value !== undefined) {
+        var array =
+        /** @type {Array<*>} */
+        objectStack[objectStack.length - 1];
+        array.push(value);
+      }
+    }
+  );
+}
+/**
+ * Make an object stack replacer function for replacing the object at the
+ * top of the stack.
+ * @param {function(this: T, Node, Array<*>): *} valueReader Value reader.
+ * @param {T=} opt_this The object to use as `this` in `valueReader`.
+ * @return {Parser} Parser.
+ * @template T
+ */
+
+
+function makeReplacer(valueReader, opt_this) {
+  return (
+    /**
+     * @param {Node} node Node.
+     * @param {Array<*>} objectStack Object stack.
+     */
+    function (node, objectStack) {
+      var value = valueReader.call(opt_this !== undefined ? opt_this : this, node, objectStack);
+
+      if (value !== undefined) {
+        objectStack[objectStack.length - 1] = value;
+      }
+    }
+  );
+}
+/**
+ * Make an object property pusher function for adding a property to the
+ * object at the top of the stack.
+ * @param {function(this: T, Element, Array<*>): *} valueReader Value reader.
+ * @param {string=} opt_property Property.
+ * @param {T=} opt_this The object to use as `this` in `valueReader`.
+ * @return {Parser} Parser.
+ * @template T
+ */
+
+
+function makeObjectPropertyPusher(valueReader, opt_property, opt_this) {
+  return (
+    /**
+     * @param {Element} node Node.
+     * @param {Array<*>} objectStack Object stack.
+     */
+    function (node, objectStack) {
+      var value = valueReader.call(opt_this !== undefined ? opt_this : this, node, objectStack);
+
+      if (value !== undefined) {
+        var object =
+        /** @type {!Object} */
+        objectStack[objectStack.length - 1];
+        var property = opt_property !== undefined ? opt_property : node.localName;
+        var array;
+
+        if (property in object) {
+          array = object[property];
+        } else {
+          array = object[property] = [];
+        }
+
+        array.push(value);
+      }
+    }
+  );
+}
+/**
+ * Make an object property setter function.
+ * @param {function(this: T, Element, Array<*>): *} valueReader Value reader.
+ * @param {string=} opt_property Property.
+ * @param {T=} opt_this The object to use as `this` in `valueReader`.
+ * @return {Parser} Parser.
+ * @template T
+ */
+
+
+function makeObjectPropertySetter(valueReader, opt_property, opt_this) {
+  return (
+    /**
+     * @param {Element} node Node.
+     * @param {Array<*>} objectStack Object stack.
+     */
+    function (node, objectStack) {
+      var value = valueReader.call(opt_this !== undefined ? opt_this : this, node, objectStack);
+
+      if (value !== undefined) {
+        var object =
+        /** @type {!Object} */
+        objectStack[objectStack.length - 1];
+        var property = opt_property !== undefined ? opt_property : node.localName;
+        object[property] = value;
+      }
+    }
+  );
+}
+/**
+ * Create a serializer that appends nodes written by its `nodeWriter` to its
+ * designated parent. The parent is the `node` of the
+ * {@link module:ol/xml~NodeStackItem} at the top of the `objectStack`.
+ * @param {function(this: T, Node, V, Array<*>)} nodeWriter Node writer.
+ * @param {T=} opt_this The object to use as `this` in `nodeWriter`.
+ * @return {Serializer} Serializer.
+ * @template T, V
+ */
+
+
+function makeChildAppender(nodeWriter, opt_this) {
+  return function (node, value, objectStack) {
+    nodeWriter.call(opt_this !== undefined ? opt_this : this, node, value, objectStack);
+    var parent =
+    /** @type {NodeStackItem} */
+    objectStack[objectStack.length - 1];
+    var parentNode = parent.node;
+    parentNode.appendChild(node);
+  };
+}
+/**
+ * Create a serializer that calls the provided `nodeWriter` from
+ * {@link module:ol/xml~serialize}. This can be used by the parent writer to have the
+ * 'nodeWriter' called with an array of values when the `nodeWriter` was
+ * designed to serialize a single item. An example would be a LineString
+ * geometry writer, which could be reused for writing MultiLineString
+ * geometries.
+ * @param {function(this: T, Element, V, Array<*>)} nodeWriter Node writer.
+ * @param {T=} opt_this The object to use as `this` in `nodeWriter`.
+ * @return {Serializer} Serializer.
+ * @template T, V
+ */
+
+
+function makeArraySerializer(nodeWriter, opt_this) {
+  var serializersNS, nodeFactory;
+  return function (node, value, objectStack) {
+    if (serializersNS === undefined) {
+      serializersNS = {};
+      var serializers = {};
+      serializers[node.localName] = nodeWriter;
+      serializersNS[node.namespaceURI] = serializers;
+      nodeFactory = makeSimpleNodeFactory(node.localName);
+    }
+
+    serialize(serializersNS, nodeFactory, value, objectStack);
+  };
+}
+/**
+ * Create a node factory which can use the `opt_keys` passed to
+ * {@link module:ol/xml~serialize} or {@link module:ol/xml~pushSerializeAndPop} as node names,
+ * or a fixed node name. The namespace of the created nodes can either be fixed,
+ * or the parent namespace will be used.
+ * @param {string=} opt_nodeName Fixed node name which will be used for all
+ *     created nodes. If not provided, the 3rd argument to the resulting node
+ *     factory needs to be provided and will be the nodeName.
+ * @param {string=} opt_namespaceURI Fixed namespace URI which will be used for
+ *     all created nodes. If not provided, the namespace of the parent node will
+ *     be used.
+ * @return {function(*, Array<*>, string=): (Node|undefined)} Node factory.
+ */
+
+
+function makeSimpleNodeFactory(opt_nodeName, opt_namespaceURI) {
+  var fixedNodeName = opt_nodeName;
+  return (
+    /**
+     * @param {*} value Value.
+     * @param {Array<*>} objectStack Object stack.
+     * @param {string=} opt_nodeName Node name.
+     * @return {Node} Node.
+     */
+    function (value, objectStack, opt_nodeName) {
+      var context =
+      /** @type {NodeStackItem} */
+      objectStack[objectStack.length - 1];
+      var node = context.node;
+      var nodeName = fixedNodeName;
+
+      if (nodeName === undefined) {
+        nodeName = opt_nodeName;
+      }
+
+      var namespaceURI = opt_namespaceURI !== undefined ? opt_namespaceURI : node.namespaceURI;
+      return createElementNS(namespaceURI,
+      /** @type {string} */
+      nodeName);
+    }
+  );
+}
+/**
+ * A node factory that creates a node using the parent's `namespaceURI` and the
+ * `nodeName` passed by {@link module:ol/xml~serialize} or
+ * {@link module:ol/xml~pushSerializeAndPop} to the node factory.
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+
+var OBJECT_PROPERTY_NODE_FACTORY = makeSimpleNodeFactory();
+/**
+ * Create an array of `values` to be used with {@link module:ol/xml~serialize} or
+ * {@link module:ol/xml~pushSerializeAndPop}, where `orderedKeys` has to be provided as
+ * `opt_key` argument.
+ * @param {Object<string, V>} object Key-value pairs for the sequence. Keys can
+ *     be a subset of the `orderedKeys`.
+ * @param {Array<string>} orderedKeys Keys in the order of the sequence.
+ * @return {Array<V>} Values in the order of the sequence. The resulting array
+ *     has the same length as the `orderedKeys` array. Values that are not
+ *     present in `object` will be `undefined` in the resulting array.
+ * @template V
+ */
+
+exports.OBJECT_PROPERTY_NODE_FACTORY = OBJECT_PROPERTY_NODE_FACTORY;
+
+function makeSequence(object, orderedKeys) {
+  var length = orderedKeys.length;
+  var sequence = new Array(length);
+
+  for (var i = 0; i < length; ++i) {
+    sequence[i] = object[orderedKeys[i]];
+  }
+
+  return sequence;
+}
+/**
+ * Create a namespaced structure, using the same values for each namespace.
+ * This can be used as a starting point for versioned parsers, when only a few
+ * values are version specific.
+ * @param {Array<string>} namespaceURIs Namespace URIs.
+ * @param {T} structure Structure.
+ * @param {Object<string, T>=} opt_structureNS Namespaced structure to add to.
+ * @return {Object<string, T>} Namespaced structure.
+ * @template T
+ */
+
+
+function makeStructureNS(namespaceURIs, structure, opt_structureNS) {
+  /**
+   * @type {Object<string, T>}
+   */
+  var structureNS = opt_structureNS !== undefined ? opt_structureNS : {};
+  var i, ii;
+
+  for (i = 0, ii = namespaceURIs.length; i < ii; ++i) {
+    structureNS[namespaceURIs[i]] = structure;
+  }
+
+  return structureNS;
+}
+/**
+ * Parse a node using the parsers and object stack.
+ * @param {Object<string, Object<string, Parser>>} parsersNS
+ *     Parsers by namespace.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @param {*=} opt_this The object to use as `this`.
+ */
+
+
+function parseNode(parsersNS, node, objectStack, opt_this) {
+  var n;
+
+  for (n = node.firstElementChild; n; n = n.nextElementSibling) {
+    var parsers = parsersNS[n.namespaceURI];
+
+    if (parsers !== undefined) {
+      var parser = parsers[n.localName];
+
+      if (parser !== undefined) {
+        parser.call(opt_this, n, objectStack);
+      }
+    }
+  }
+}
+/**
+ * Push an object on top of the stack, parse and return the popped object.
+ * @param {T} object Object.
+ * @param {Object<string, Object<string, Parser>>} parsersNS
+ *     Parsers by namespace.
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @param {*=} opt_this The object to use as `this`.
+ * @return {T} Object.
+ * @template T
+ */
+
+
+function pushParseAndPop(object, parsersNS, node, objectStack, opt_this) {
+  objectStack.push(object);
+  parseNode(parsersNS, node, objectStack, opt_this);
+  return (
+    /** @type {T} */
+    objectStack.pop()
+  );
+}
+/**
+ * Walk through an array of `values` and call a serializer for each value.
+ * @param {Object<string, Object<string, Serializer>>} serializersNS
+ *     Namespaced serializers.
+ * @param {function(this: T, *, Array<*>, (string|undefined)): (Node|undefined)} nodeFactory
+ *     Node factory. The `nodeFactory` creates the node whose namespace and name
+ *     will be used to choose a node writer from `serializersNS`. This
+ *     separation allows us to decide what kind of node to create, depending on
+ *     the value we want to serialize. An example for this would be different
+ *     geometry writers based on the geometry type.
+ * @param {Array<*>} values Values to serialize. An example would be an array
+ *     of {@link module:ol/Feature~Feature} instances.
+ * @param {Array<*>} objectStack Node stack.
+ * @param {Array<string>=} opt_keys Keys of the `values`. Will be passed to the
+ *     `nodeFactory`. This is used for serializing object literals where the
+ *     node name relates to the property key. The array length of `opt_keys` has
+ *     to match the length of `values`. For serializing a sequence, `opt_keys`
+ *     determines the order of the sequence.
+ * @param {T=} opt_this The object to use as `this` for the node factory and
+ *     serializers.
+ * @template T
+ */
+
+
+function serialize(serializersNS, nodeFactory, values, objectStack, opt_keys, opt_this) {
+  var length = (opt_keys !== undefined ? opt_keys : values).length;
+  var value, node;
+
+  for (var i = 0; i < length; ++i) {
+    value = values[i];
+
+    if (value !== undefined) {
+      node = nodeFactory.call(opt_this !== undefined ? opt_this : this, value, objectStack, opt_keys !== undefined ? opt_keys[i] : undefined);
+
+      if (node !== undefined) {
+        serializersNS[node.namespaceURI][node.localName].call(opt_this, node, value, objectStack);
+      }
+    }
+  }
+}
+/**
+ * @param {O} object Object.
+ * @param {Object<string, Object<string, Serializer>>} serializersNS
+ *     Namespaced serializers.
+ * @param {function(this: T, *, Array<*>, (string|undefined)): (Node|undefined)} nodeFactory
+ *     Node factory. The `nodeFactory` creates the node whose namespace and name
+ *     will be used to choose a node writer from `serializersNS`. This
+ *     separation allows us to decide what kind of node to create, depending on
+ *     the value we want to serialize. An example for this would be different
+ *     geometry writers based on the geometry type.
+ * @param {Array<*>} values Values to serialize. An example would be an array
+ *     of {@link module:ol/Feature~Feature} instances.
+ * @param {Array<*>} objectStack Node stack.
+ * @param {Array<string>=} opt_keys Keys of the `values`. Will be passed to the
+ *     `nodeFactory`. This is used for serializing object literals where the
+ *     node name relates to the property key. The array length of `opt_keys` has
+ *     to match the length of `values`. For serializing a sequence, `opt_keys`
+ *     determines the order of the sequence.
+ * @param {T=} opt_this The object to use as `this` for the node factory and
+ *     serializers.
+ * @return {O|undefined} Object.
+ * @template O, T
+ */
+
+
+function pushSerializeAndPop(object, serializersNS, nodeFactory, values, objectStack, opt_keys, opt_this) {
+  objectStack.push(object);
+  serialize(serializersNS, nodeFactory, values, objectStack, opt_keys, opt_this);
+  return (
+    /** @type {O|undefined} */
+    objectStack.pop()
+  );
+}
+},{"./array.js":"../node_modules/ol/array.js"}],"../node_modules/ol/format/XMLFeature.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _util = require("../util.js");
+
+var _array = require("../array.js");
+
+var _Feature = _interopRequireDefault(require("../format/Feature.js"));
+
+var _FormatType = _interopRequireDefault(require("../format/FormatType.js"));
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/XMLFeature
+ */
+
+/**
+ * @classdesc
+ * Abstract base class; normally only used for creating subclasses and not
+ * instantiated in apps.
+ * Base class for XML feature formats.
+ *
+ * @abstract
+ */
+var XMLFeature =
+/*@__PURE__*/
+function (FeatureFormat) {
+  function XMLFeature() {
+    FeatureFormat.call(this);
+    /**
+     * @type {XMLSerializer}
+     * @private
+     */
+
+    this.xmlSerializer_ = new XMLSerializer();
+  }
+
+  if (FeatureFormat) XMLFeature.__proto__ = FeatureFormat;
+  XMLFeature.prototype = Object.create(FeatureFormat && FeatureFormat.prototype);
+  XMLFeature.prototype.constructor = XMLFeature;
+  /**
+   * @inheritDoc
+   */
+
+  XMLFeature.prototype.getType = function getType() {
+    return _FormatType.default.XML;
+  };
+  /**
+   * Read a single feature.
+   *
+   * @param {Document|Node|Object|string} source Source.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @return {import("../Feature.js").default} Feature.
+   * @api
+   */
+
+
+  XMLFeature.prototype.readFeature = function readFeature(source, opt_options) {
+    if (!source) {
+      return null;
+    } else if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      return this.readFeatureFromDocument(doc, opt_options);
+    } else if ((0, _xml.isDocument)(source)) {
+      return this.readFeatureFromDocument(
+      /** @type {Document} */
+      source, opt_options);
+    } else {
+      return this.readFeatureFromNode(
+      /** @type {Node} */
+      source, opt_options);
+    }
+  };
+  /**
+   * @param {Document} doc Document.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @return {import("../Feature.js").default} Feature.
+   */
+
+
+  XMLFeature.prototype.readFeatureFromDocument = function readFeatureFromDocument(doc, opt_options) {
+    var features = this.readFeaturesFromDocument(doc, opt_options);
+
+    if (features.length > 0) {
+      return features[0];
+    } else {
+      return null;
+    }
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @return {import("../Feature.js").default} Feature.
+   */
+
+
+  XMLFeature.prototype.readFeatureFromNode = function readFeatureFromNode(node, opt_options) {
+    return null; // not implemented
+  };
+  /**
+   * Read all features from a feature collection.
+   *
+   * @param {Document|Node|Object|string} source Source.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @return {Array<import("../Feature.js").default>} Features.
+   * @api
+   */
+
+
+  XMLFeature.prototype.readFeatures = function readFeatures(source, opt_options) {
+    if (!source) {
+      return [];
+    } else if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      return this.readFeaturesFromDocument(doc, opt_options);
+    } else if ((0, _xml.isDocument)(source)) {
+      return this.readFeaturesFromDocument(
+      /** @type {Document} */
+      source, opt_options);
+    } else {
+      return this.readFeaturesFromNode(
+      /** @type {Node} */
+      source, opt_options);
+    }
+  };
+  /**
+   * @param {Document} doc Document.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @protected
+   * @return {Array<import("../Feature.js").default>} Features.
+   */
+
+
+  XMLFeature.prototype.readFeaturesFromDocument = function readFeaturesFromDocument(doc, opt_options) {
+    /** @type {Array<import("../Feature.js").default>} */
+    var features = [];
+
+    for (var n =
+    /** @type {Node} */
+    doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        (0, _array.extend)(features, this.readFeaturesFromNode(n, opt_options));
+      }
+    }
+
+    return features;
+  };
+  /**
+   * @abstract
+   * @param {Node} node Node.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @protected
+   * @return {Array<import("../Feature.js").default>} Features.
+   */
+
+
+  XMLFeature.prototype.readFeaturesFromNode = function readFeaturesFromNode(node, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  XMLFeature.prototype.readGeometry = function readGeometry(source, opt_options) {
+    if (!source) {
+      return null;
+    } else if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      return this.readGeometryFromDocument(doc, opt_options);
+    } else if ((0, _xml.isDocument)(source)) {
+      return this.readGeometryFromDocument(
+      /** @type {Document} */
+      source, opt_options);
+    } else {
+      return this.readGeometryFromNode(
+      /** @type {Node} */
+      source, opt_options);
+    }
+  };
+  /**
+   * @param {Document} doc Document.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @protected
+   * @return {import("../geom/Geometry.js").default} Geometry.
+   */
+
+
+  XMLFeature.prototype.readGeometryFromDocument = function readGeometryFromDocument(doc, opt_options) {
+    return null; // not implemented
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Options.
+   * @protected
+   * @return {import("../geom/Geometry.js").default} Geometry.
+   */
+
+
+  XMLFeature.prototype.readGeometryFromNode = function readGeometryFromNode(node, opt_options) {
+    return null; // not implemented
+  };
+  /**
+   * Read the projection from the source.
+   *
+   * @param {Document|Node|Object|string} source Source.
+   * @return {import("../proj/Projection.js").default} Projection.
+   * @api
+   */
+
+
+  XMLFeature.prototype.readProjection = function readProjection(source) {
+    if (!source) {
+      return null;
+    } else if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      return this.readProjectionFromDocument(doc);
+    } else if ((0, _xml.isDocument)(source)) {
+      return this.readProjectionFromDocument(
+      /** @type {Document} */
+      source);
+    } else {
+      return this.readProjectionFromNode(
+      /** @type {Node} */
+      source);
+    }
+  };
+  /**
+   * @param {Document} doc Document.
+   * @protected
+   * @return {import("../proj/Projection.js").default} Projection.
+   */
+
+
+  XMLFeature.prototype.readProjectionFromDocument = function readProjectionFromDocument(doc) {
+    return this.dataProjection;
+  };
+  /**
+   * @param {Node} node Node.
+   * @protected
+   * @return {import("../proj/Projection.js").default} Projection.
+   */
+
+
+  XMLFeature.prototype.readProjectionFromNode = function readProjectionFromNode(node) {
+    return this.dataProjection;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  XMLFeature.prototype.writeFeature = function writeFeature(feature, opt_options) {
+    var node = this.writeFeatureNode(feature, opt_options);
+    return this.xmlSerializer_.serializeToString(node);
+  };
+  /**
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+   * @protected
+   * @return {Node} Node.
+   */
+
+
+  XMLFeature.prototype.writeFeatureNode = function writeFeatureNode(feature, opt_options) {
+    return null; // not implemented
+  };
+  /**
+   * Encode an array of features as string.
+   *
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {string} Result.
+   * @api
+   */
+
+
+  XMLFeature.prototype.writeFeatures = function writeFeatures(features, opt_options) {
+    var node = this.writeFeaturesNode(features, opt_options);
+    return this.xmlSerializer_.serializeToString(node);
+  };
+  /**
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+   * @return {Node} Node.
+   */
+
+
+  XMLFeature.prototype.writeFeaturesNode = function writeFeaturesNode(features, opt_options) {
+    return null; // not implemented
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  XMLFeature.prototype.writeGeometry = function writeGeometry(geometry, opt_options) {
+    var node = this.writeGeometryNode(geometry, opt_options);
+    return this.xmlSerializer_.serializeToString(node);
+  };
+  /**
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+   * @return {Node} Node.
+   */
+
+
+  XMLFeature.prototype.writeGeometryNode = function writeGeometryNode(geometry, opt_options) {
+    return null; // not implemented
+  };
+
+  return XMLFeature;
+}(_Feature.default);
+
+var _default = XMLFeature;
+exports.default = _default;
+},{"../util.js":"../node_modules/ol/util.js","../array.js":"../node_modules/ol/array.js","../format/Feature.js":"../node_modules/ol/format/Feature.js","../format/FormatType.js":"../node_modules/ol/format/FormatType.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/GMLBase.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = exports.GMLNS = void 0;
+
+var _array = require("../array.js");
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _Feature2 = require("./Feature.js");
+
+var _XMLFeature = _interopRequireDefault(require("./XMLFeature.js"));
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _LinearRing = _interopRequireDefault(require("../geom/LinearRing.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _MultiPoint = _interopRequireDefault(require("../geom/MultiPoint.js"));
+
+var _MultiPolygon = _interopRequireDefault(require("../geom/MultiPolygon.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _Polygon = _interopRequireDefault(require("../geom/Polygon.js"));
+
+var _obj = require("../obj.js");
+
+var _proj = require("../proj.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/GMLBase
+ */
+// FIXME Envelopes should not be treated as geometries! readEnvelope_ is part
+// of GEOMETRY_PARSERS_ and methods using GEOMETRY_PARSERS_ do not expect
+// envelopes/extents, only geometries!
+
+/**
+ * @const
+ * @type {string}
+ */
+var GMLNS = 'http://www.opengis.net/gml';
+/**
+ * A regular expression that matches if a string only contains whitespace
+ * characters. It will e.g. match `''`, `' '`, `'\n'` etc. The non-breaking
+ * space (0xa0) is explicitly included as IE doesn't include it in its
+ * definition of `\s`.
+ *
+ * Information from `goog.string.isEmptyOrWhitespace`: https://github.com/google/closure-library/blob/e877b1e/closure/goog/string/string.js#L156-L160
+ *
+ * @const
+ * @type {RegExp}
+ */
+
+exports.GMLNS = GMLNS;
+var ONLY_WHITESPACE_RE = /^[\s\xa0]*$/;
+/**
+ * @typedef {Object} Options
+ * @property {Object<string, string>|string} [featureNS] Feature
+ * namespace. If not defined will be derived from GML. If multiple
+ * feature types have been configured which come from different feature
+ * namespaces, this will be an object with the keys being the prefixes used
+ * in the entries of featureType array. The values of the object will be the
+ * feature namespaces themselves. So for instance there might be a featureType
+ * item `topp:states` in the `featureType` array and then there will be a key
+ * `topp` in the featureNS object with value `http://www.openplans.org/topp`.
+ * @property {Array<string>|string} [featureType] Feature type(s) to parse.
+ * If multiple feature types need to be configured
+ * which come from different feature namespaces, `featureNS` will be an object
+ * with the keys being the prefixes used in the entries of featureType array.
+ * The values of the object will be the feature namespaces themselves.
+ * So for instance there might be a featureType item `topp:states` and then
+ * there will be a key named `topp` in the featureNS object with value
+ * `http://www.openplans.org/topp`.
+ * @property {string} srsName srsName to use when writing geometries.
+ * @property {boolean} [surface=false] Write gml:Surface instead of gml:Polygon
+ * elements. This also affects the elements in multi-part geometries.
+ * @property {boolean} [curve=false] Write gml:Curve instead of gml:LineString
+ * elements. This also affects the elements in multi-part geometries.
+ * @property {boolean} [multiCurve=true] Write gml:MultiCurve instead of gml:MultiLineString.
+ * Since the latter is deprecated in GML 3.
+ * @property {boolean} [multiSurface=true] Write gml:multiSurface instead of
+ * gml:MultiPolygon. Since the latter is deprecated in GML 3.
+ * @property {string} [schemaLocation] Optional schemaLocation to use when
+ * writing out the GML, this will override the default provided.
+ * @property {boolean} [hasZ=false] If coordinates have a Z value.
+ */
+
+/**
+ * @classdesc
+ * Abstract base class; normally only used for creating subclasses and not
+ * instantiated in apps.
+ * Feature base format for reading and writing data in the GML format.
+ * This class cannot be instantiated, it contains only base content that
+ * is shared with versioned format classes GML2 and GML3.
+ *
+ * @abstract
+ */
+
+var GMLBase =
+/*@__PURE__*/
+function (XMLFeature) {
+  function GMLBase(opt_options) {
+    XMLFeature.call(this);
+    var options =
+    /** @type {Options} */
+    opt_options ? opt_options : {};
+    /**
+     * @protected
+     * @type {Array<string>|string|undefined}
+     */
+
+    this.featureType = options.featureType;
+    /**
+     * @protected
+     * @type {Object<string, string>|string|undefined}
+     */
+
+    this.featureNS = options.featureNS;
+    /**
+     * @protected
+     * @type {string}
+     */
+
+    this.srsName = options.srsName;
+    /**
+     * @protected
+     * @type {string}
+     */
+
+    this.schemaLocation = '';
+    /**
+     * @type {Object<string, Object<string, Object>>}
+     */
+
+    this.FEATURE_COLLECTION_PARSERS = {};
+    this.FEATURE_COLLECTION_PARSERS[this.namespace] = {
+      'featureMember': (0, _xml.makeArrayPusher)(this.readFeaturesInternal),
+      'featureMembers': (0, _xml.makeReplacer)(this.readFeaturesInternal)
+    };
+  }
+
+  if (XMLFeature) GMLBase.__proto__ = XMLFeature;
+  GMLBase.prototype = Object.create(XMLFeature && XMLFeature.prototype);
+  GMLBase.prototype.constructor = GMLBase;
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {Array<Feature> | undefined} Features.
+   */
+
+  GMLBase.prototype.readFeaturesInternal = function readFeaturesInternal(node, objectStack) {
+    var localName = node.localName;
+    var features = null;
+
+    if (localName == 'FeatureCollection') {
+      features = (0, _xml.pushParseAndPop)([], this.FEATURE_COLLECTION_PARSERS, node, objectStack, this);
+    } else if (localName == 'featureMembers' || localName == 'featureMember') {
+      var context = objectStack[0];
+      var featureType = context['featureType'];
+      var featureNS = context['featureNS'];
+      var prefix = 'p';
+      var defaultPrefix = 'p0';
+
+      if (!featureType && node.childNodes) {
+        featureType = [], featureNS = {};
+
+        for (var i = 0, ii = node.childNodes.length; i < ii; ++i) {
+          var child = node.childNodes[i];
+
+          if (child.nodeType === 1) {
+            var ft = child.nodeName.split(':').pop();
+
+            if (featureType.indexOf(ft) === -1) {
+              var key = '';
+              var count = 0;
+              var uri = child.namespaceURI;
+
+              for (var candidate in featureNS) {
+                if (featureNS[candidate] === uri) {
+                  key = candidate;
+                  break;
+                }
+
+                ++count;
+              }
+
+              if (!key) {
+                key = prefix + count;
+                featureNS[key] = uri;
+              }
+
+              featureType.push(key + ':' + ft);
+            }
+          }
+        }
+
+        if (localName != 'featureMember') {
+          // recheck featureType for each featureMember
+          context['featureType'] = featureType;
+          context['featureNS'] = featureNS;
+        }
+      }
+
+      if (typeof featureNS === 'string') {
+        var ns = featureNS;
+        featureNS = {};
+        featureNS[defaultPrefix] = ns;
+      }
+      /** @type {Object<string, Object<string, import("../xml.js").Parser>>} */
+
+
+      var parsersNS = {};
+      var featureTypes = Array.isArray(featureType) ? featureType : [featureType];
+
+      for (var p in featureNS) {
+        /** @type {Object<string, import("../xml.js").Parser>} */
+        var parsers = {};
+
+        for (var i$1 = 0, ii$1 = featureTypes.length; i$1 < ii$1; ++i$1) {
+          var featurePrefix = featureTypes[i$1].indexOf(':') === -1 ? defaultPrefix : featureTypes[i$1].split(':')[0];
+
+          if (featurePrefix === p) {
+            parsers[featureTypes[i$1].split(':').pop()] = localName == 'featureMembers' ? (0, _xml.makeArrayPusher)(this.readFeatureElement, this) : (0, _xml.makeReplacer)(this.readFeatureElement, this);
+          }
+        }
+
+        parsersNS[featureNS[p]] = parsers;
+      }
+
+      if (localName == 'featureMember') {
+        features = (0, _xml.pushParseAndPop)(undefined, parsersNS, node, objectStack);
+      } else {
+        features = (0, _xml.pushParseAndPop)([], parsersNS, node, objectStack);
+      }
+    }
+
+    if (features === null) {
+      features = [];
+    }
+
+    return features;
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {import("../geom/Geometry.js").default|undefined} Geometry.
+   */
+
+
+  GMLBase.prototype.readGeometryElement = function readGeometryElement(node, objectStack) {
+    var context =
+    /** @type {Object} */
+    objectStack[0];
+    context['srsName'] = node.firstElementChild.getAttribute('srsName');
+    context['srsDimension'] = node.firstElementChild.getAttribute('srsDimension');
+    /** @type {import("../geom/Geometry.js").default} */
+
+    var geometry = (0, _xml.pushParseAndPop)(null, this.GEOMETRY_PARSERS, node, objectStack, this);
+
+    if (geometry) {
+      return (
+        /** @type {import("../geom/Geometry.js").default} */
+        (0, _Feature2.transformWithOptions)(geometry, false, context)
+      );
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @param {boolean} asFeature whether result should be wrapped as a feature.
+   * @return {Feature|Object} Feature
+   */
+
+
+  GMLBase.prototype.readFeatureElementInternal = function readFeatureElementInternal(node, objectStack, asFeature) {
+    var geometryName;
+    var values = {};
+
+    for (var n = node.firstElementChild; n; n = n.nextElementSibling) {
+      var value = void 0;
+      var localName = n.localName; // first, check if it is simple attribute
+
+      if (n.childNodes.length === 0 || n.childNodes.length === 1 && (n.firstChild.nodeType === 3 || n.firstChild.nodeType === 4)) {
+        value = (0, _xml.getAllTextContent)(n, false);
+
+        if (ONLY_WHITESPACE_RE.test(value)) {
+          value = undefined;
+        }
+      } else {
+        if (asFeature) {
+          //if feature, try it as a geometry
+          value = this.readGeometryElement(n, objectStack);
+        }
+
+        if (!value) {
+          //if not a geometry or not a feature, treat it as a complex attribute
+          value = this.readFeatureElementInternal(n, objectStack, false);
+        } else if (localName !== 'boundedBy') {
+          // boundedBy is an extent and must not be considered as a geometry
+          geometryName = localName;
+        }
+      }
+
+      if (values[localName]) {
+        if (!(values[localName] instanceof Array)) {
+          values[localName] = [values[localName]];
+        }
+
+        values[localName].push(value);
+      } else {
+        values[localName] = value;
+      }
+
+      var len = n.attributes.length;
+
+      if (len > 0) {
+        values[localName] = {
+          _content_: values[localName]
+        };
+
+        for (var i = 0; i < len; i++) {
+          var attName = n.attributes[i].name;
+          values[localName][attName] = n.attributes[i].value;
+        }
+      }
+    }
+
+    if (!asFeature) {
+      return values;
+    } else {
+      var feature = new _Feature.default(values);
+
+      if (geometryName) {
+        feature.setGeometryName(geometryName);
+      }
+
+      var fid = node.getAttribute('fid') || (0, _xml.getAttributeNS)(node, this.namespace, 'id');
+
+      if (fid) {
+        feature.setId(fid);
+      }
+
+      return feature;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {Feature} Feature.
+   */
+
+
+  GMLBase.prototype.readFeatureElement = function readFeatureElement(node, objectStack) {
+    return this.readFeatureElementInternal(node, objectStack, true);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {Point|undefined} Point.
+   */
+
+
+  GMLBase.prototype.readPoint = function readPoint(node, objectStack) {
+    var flatCoordinates = this.readFlatCoordinatesFromNode_(node, objectStack);
+
+    if (flatCoordinates) {
+      return new _Point.default(flatCoordinates, _GeometryLayout.default.XYZ);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {MultiPoint|undefined} MultiPoint.
+   */
+
+
+  GMLBase.prototype.readMultiPoint = function readMultiPoint(node, objectStack) {
+    /** @type {Array<Array<number>>} */
+    var coordinates = (0, _xml.pushParseAndPop)([], this.MULTIPOINT_PARSERS_, node, objectStack, this);
+
+    if (coordinates) {
+      return new _MultiPoint.default(coordinates);
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {MultiLineString|undefined} MultiLineString.
+   */
+
+
+  GMLBase.prototype.readMultiLineString = function readMultiLineString(node, objectStack) {
+    /** @type {Array<LineString>} */
+    var lineStrings = (0, _xml.pushParseAndPop)([], this.MULTILINESTRING_PARSERS_, node, objectStack, this);
+
+    if (lineStrings) {
+      return new _MultiLineString.default(lineStrings);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {MultiPolygon|undefined} MultiPolygon.
+   */
+
+
+  GMLBase.prototype.readMultiPolygon = function readMultiPolygon(node, objectStack) {
+    /** @type {Array<Polygon>} */
+    var polygons = (0, _xml.pushParseAndPop)([], this.MULTIPOLYGON_PARSERS_, node, objectStack, this);
+
+    if (polygons) {
+      return new _MultiPolygon.default(polygons);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GMLBase.prototype.pointMemberParser_ = function pointMemberParser_(node, objectStack) {
+    (0, _xml.parseNode)(this.POINTMEMBER_PARSERS_, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GMLBase.prototype.lineStringMemberParser_ = function lineStringMemberParser_(node, objectStack) {
+    (0, _xml.parseNode)(this.LINESTRINGMEMBER_PARSERS_, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GMLBase.prototype.polygonMemberParser_ = function polygonMemberParser_(node, objectStack) {
+    (0, _xml.parseNode)(this.POLYGONMEMBER_PARSERS_, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {LineString|undefined} LineString.
+   */
+
+
+  GMLBase.prototype.readLineString = function readLineString(node, objectStack) {
+    var flatCoordinates = this.readFlatCoordinatesFromNode_(node, objectStack);
+
+    if (flatCoordinates) {
+      var lineString = new _LineString.default(flatCoordinates, _GeometryLayout.default.XYZ);
+      return lineString;
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<number>|undefined} LinearRing flat coordinates.
+   */
+
+
+  GMLBase.prototype.readFlatLinearRing_ = function readFlatLinearRing_(node, objectStack) {
+    var ring = (0, _xml.pushParseAndPop)(null, this.GEOMETRY_FLAT_COORDINATES_PARSERS, node, objectStack, this);
+
+    if (ring) {
+      return ring;
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {LinearRing|undefined} LinearRing.
+   */
+
+
+  GMLBase.prototype.readLinearRing = function readLinearRing(node, objectStack) {
+    var flatCoordinates = this.readFlatCoordinatesFromNode_(node, objectStack);
+
+    if (flatCoordinates) {
+      return new _LinearRing.default(flatCoordinates, _GeometryLayout.default.XYZ);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {Polygon|undefined} Polygon.
+   */
+
+
+  GMLBase.prototype.readPolygon = function readPolygon(node, objectStack) {
+    /** @type {Array<Array<number>>} */
+    var flatLinearRings = (0, _xml.pushParseAndPop)([null], this.FLAT_LINEAR_RINGS_PARSERS, node, objectStack, this);
+
+    if (flatLinearRings && flatLinearRings[0]) {
+      var flatCoordinates = flatLinearRings[0];
+      var ends = [flatCoordinates.length];
+      var i, ii;
+
+      for (i = 1, ii = flatLinearRings.length; i < ii; ++i) {
+        (0, _array.extend)(flatCoordinates, flatLinearRings[i]);
+        ends.push(flatCoordinates.length);
+      }
+
+      return new _Polygon.default(flatCoordinates, _GeometryLayout.default.XYZ, ends);
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<number>} Flat coordinates.
+   */
+
+
+  GMLBase.prototype.readFlatCoordinatesFromNode_ = function readFlatCoordinatesFromNode_(node, objectStack) {
+    return (0, _xml.pushParseAndPop)(null, this.GEOMETRY_FLAT_COORDINATES_PARSERS, node, objectStack, this);
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GMLBase.prototype.readGeometryFromNode = function readGeometryFromNode(node, opt_options) {
+    var geometry = this.readGeometryElement(node, [this.getReadOptions(node, opt_options ? opt_options : {})]);
+    return geometry ? geometry : null;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GMLBase.prototype.readFeaturesFromNode = function readFeaturesFromNode(node, opt_options) {
+    var options = {
+      featureType: this.featureType,
+      featureNS: this.featureNS
+    };
+
+    if (opt_options) {
+      (0, _obj.assign)(options, this.getReadOptions(node, opt_options));
+    }
+
+    var features = this.readFeaturesInternal(node, [options]);
+    return features || [];
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GMLBase.prototype.readProjectionFromNode = function readProjectionFromNode(node) {
+    return (0, _proj.get)(this.srsName ? this.srsName : node.firstElementChild.getAttribute('srsName'));
+  };
+
+  return GMLBase;
+}(_XMLFeature.default);
+
+GMLBase.prototype.namespace = GMLNS;
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+GMLBase.prototype.FLAT_LINEAR_RINGS_PARSERS = {
+  'http://www.opengis.net/gml': {}
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+GMLBase.prototype.GEOMETRY_FLAT_COORDINATES_PARSERS = {
+  'http://www.opengis.net/gml': {}
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+GMLBase.prototype.GEOMETRY_PARSERS = {
+  'http://www.opengis.net/gml': {}
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GMLBase.prototype.MULTIPOINT_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'pointMember': (0, _xml.makeArrayPusher)(GMLBase.prototype.pointMemberParser_),
+    'pointMembers': (0, _xml.makeArrayPusher)(GMLBase.prototype.pointMemberParser_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GMLBase.prototype.MULTILINESTRING_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'lineStringMember': (0, _xml.makeArrayPusher)(GMLBase.prototype.lineStringMemberParser_),
+    'lineStringMembers': (0, _xml.makeArrayPusher)(GMLBase.prototype.lineStringMemberParser_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GMLBase.prototype.MULTIPOLYGON_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'polygonMember': (0, _xml.makeArrayPusher)(GMLBase.prototype.polygonMemberParser_),
+    'polygonMembers': (0, _xml.makeArrayPusher)(GMLBase.prototype.polygonMemberParser_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GMLBase.prototype.POINTMEMBER_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'Point': (0, _xml.makeArrayPusher)(GMLBase.prototype.readFlatCoordinatesFromNode_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GMLBase.prototype.LINESTRINGMEMBER_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'LineString': (0, _xml.makeArrayPusher)(GMLBase.prototype.readLineString)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GMLBase.prototype.POLYGONMEMBER_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'Polygon': (0, _xml.makeArrayPusher)(GMLBase.prototype.readPolygon)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+GMLBase.prototype.RING_PARSERS = {
+  'http://www.opengis.net/gml': {
+    'LinearRing': (0, _xml.makeReplacer)(GMLBase.prototype.readFlatLinearRing_)
+  }
+};
+var _default = GMLBase;
+exports.default = _default;
+},{"../array.js":"../node_modules/ol/array.js","../Feature.js":"../node_modules/ol/Feature.js","./Feature.js":"../node_modules/ol/format/Feature.js","./XMLFeature.js":"../node_modules/ol/format/XMLFeature.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/LinearRing.js":"../node_modules/ol/geom/LinearRing.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/MultiPoint.js":"../node_modules/ol/geom/MultiPoint.js","../geom/MultiPolygon.js":"../node_modules/ol/geom/MultiPolygon.js","../geom/Point.js":"../node_modules/ol/geom/Point.js","../geom/Polygon.js":"../node_modules/ol/geom/Polygon.js","../obj.js":"../node_modules/ol/obj.js","../proj.js":"../node_modules/ol/proj.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/xsd.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.readBoolean = readBoolean;
+exports.readBooleanString = readBooleanString;
+exports.readDateTime = readDateTime;
+exports.readDecimal = readDecimal;
+exports.readDecimalString = readDecimalString;
+exports.readNonNegativeInteger = readNonNegativeInteger;
+exports.readNonNegativeIntegerString = readNonNegativeIntegerString;
+exports.readString = readString;
+exports.writeBooleanTextNode = writeBooleanTextNode;
+exports.writeCDATASection = writeCDATASection;
+exports.writeDateTimeTextNode = writeDateTimeTextNode;
+exports.writeDecimalTextNode = writeDecimalTextNode;
+exports.writeNonNegativeIntegerTextNode = writeNonNegativeIntegerTextNode;
+exports.writeStringTextNode = writeStringTextNode;
+
+var _xml = require("../xml.js");
+
+var _string = require("../string.js");
+
+/**
+ * @module ol/format/xsd
+ */
+
+/**
+ * @param {Node} node Node.
+ * @return {boolean|undefined} Boolean.
+ */
+function readBoolean(node) {
+  var s = (0, _xml.getAllTextContent)(node, false);
+  return readBooleanString(s);
+}
+/**
+ * @param {string} string String.
+ * @return {boolean|undefined} Boolean.
+ */
+
+
+function readBooleanString(string) {
+  var m = /^\s*(true|1)|(false|0)\s*$/.exec(string);
+
+  if (m) {
+    return m[1] !== undefined || false;
+  } else {
+    return undefined;
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @return {number|undefined} DateTime in seconds.
+ */
+
+
+function readDateTime(node) {
+  var s = (0, _xml.getAllTextContent)(node, false);
+  var dateTime = Date.parse(s);
+  return isNaN(dateTime) ? undefined : dateTime / 1000;
+}
+/**
+ * @param {Node} node Node.
+ * @return {number|undefined} Decimal.
+ */
+
+
+function readDecimal(node) {
+  var s = (0, _xml.getAllTextContent)(node, false);
+  return readDecimalString(s);
+}
+/**
+ * @param {string} string String.
+ * @return {number|undefined} Decimal.
+ */
+
+
+function readDecimalString(string) {
+  // FIXME check spec
+  var m = /^\s*([+\-]?\d*\.?\d+(?:e[+\-]?\d+)?)\s*$/i.exec(string);
+
+  if (m) {
+    return parseFloat(m[1]);
+  } else {
+    return undefined;
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @return {number|undefined} Non negative integer.
+ */
+
+
+function readNonNegativeInteger(node) {
+  var s = (0, _xml.getAllTextContent)(node, false);
+  return readNonNegativeIntegerString(s);
+}
+/**
+ * @param {string} string String.
+ * @return {number|undefined} Non negative integer.
+ */
+
+
+function readNonNegativeIntegerString(string) {
+  var m = /^\s*(\d+)\s*$/.exec(string);
+
+  if (m) {
+    return parseInt(m[1], 10);
+  } else {
+    return undefined;
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @return {string|undefined} String.
+ */
+
+
+function readString(node) {
+  return (0, _xml.getAllTextContent)(node, false).trim();
+}
+/**
+ * @param {Node} node Node to append a TextNode with the boolean to.
+ * @param {boolean} bool Boolean.
+ */
+
+
+function writeBooleanTextNode(node, bool) {
+  writeStringTextNode(node, bool ? '1' : '0');
+}
+/**
+ * @param {Node} node Node to append a CDATA Section with the string to.
+ * @param {string} string String.
+ */
+
+
+function writeCDATASection(node, string) {
+  node.appendChild(_xml.DOCUMENT.createCDATASection(string));
+}
+/**
+ * @param {Node} node Node to append a TextNode with the dateTime to.
+ * @param {number} dateTime DateTime in seconds.
+ */
+
+
+function writeDateTimeTextNode(node, dateTime) {
+  var date = new Date(dateTime * 1000);
+  var string = date.getUTCFullYear() + '-' + (0, _string.padNumber)(date.getUTCMonth() + 1, 2) + '-' + (0, _string.padNumber)(date.getUTCDate(), 2) + 'T' + (0, _string.padNumber)(date.getUTCHours(), 2) + ':' + (0, _string.padNumber)(date.getUTCMinutes(), 2) + ':' + (0, _string.padNumber)(date.getUTCSeconds(), 2) + 'Z';
+  node.appendChild(_xml.DOCUMENT.createTextNode(string));
+}
+/**
+ * @param {Node} node Node to append a TextNode with the decimal to.
+ * @param {number} decimal Decimal.
+ */
+
+
+function writeDecimalTextNode(node, decimal) {
+  var string = decimal.toPrecision();
+  node.appendChild(_xml.DOCUMENT.createTextNode(string));
+}
+/**
+ * @param {Node} node Node to append a TextNode with the decimal to.
+ * @param {number} nonNegativeInteger Non negative integer.
+ */
+
+
+function writeNonNegativeIntegerTextNode(node, nonNegativeInteger) {
+  var string = nonNegativeInteger.toString();
+  node.appendChild(_xml.DOCUMENT.createTextNode(string));
+}
+/**
+ * @param {Node} node Node to append a TextNode with the string to.
+ * @param {string} string String.
+ */
+
+
+function writeStringTextNode(node, string) {
+  node.appendChild(_xml.DOCUMENT.createTextNode(string));
+}
+},{"../xml.js":"../node_modules/ol/xml.js","../string.js":"../node_modules/ol/string.js"}],"../node_modules/ol/format/GML3.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _array = require("../array.js");
+
+var _extent = require("../extent.js");
+
+var _Feature = require("./Feature.js");
+
+var _GMLBase = _interopRequireWildcard(require("./GMLBase.js"));
+
+var _xsd = require("./xsd.js");
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _MultiPolygon = _interopRequireDefault(require("../geom/MultiPolygon.js"));
+
+var _Polygon = _interopRequireDefault(require("../geom/Polygon.js"));
+
+var _obj = require("../obj.js");
+
+var _proj = require("../proj.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = Object.defineProperty && Object.getOwnPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : {}; if (desc.get || desc.set) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } } newObj.default = obj; return newObj; } }
+
+/**
+ * @module ol/format/GML3
+ */
+
+/**
+ * @const
+ * @type {string}
+ * @private
+ */
+var schemaLocation = _GMLBase.GMLNS + ' http://schemas.opengis.net/gml/3.1.1/profiles/gmlsfProfile/' + '1.0.0/gmlsf.xsd';
+/**
+ * @const
+ * @type {Object<string, string>}
+ */
+
+var MULTIGEOMETRY_TO_MEMBER_NODENAME = {
+  'MultiLineString': 'lineStringMember',
+  'MultiCurve': 'curveMember',
+  'MultiPolygon': 'polygonMember',
+  'MultiSurface': 'surfaceMember'
+};
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the GML format
+ * version 3.1.1.
+ * Currently only supports GML 3.1.1 Simple Features profile.
+ *
+ * @api
+ */
+
+var GML3 =
+/*@__PURE__*/
+function (GMLBase) {
+  function GML3(opt_options) {
+    var options =
+    /** @type {import("./GMLBase.js").Options} */
+    opt_options ? opt_options : {};
+    GMLBase.call(this, options);
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.surface_ = options.surface !== undefined ? options.surface : false;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.curve_ = options.curve !== undefined ? options.curve : false;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.multiCurve_ = options.multiCurve !== undefined ? options.multiCurve : true;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.multiSurface_ = options.multiSurface !== undefined ? options.multiSurface : true;
+    /**
+     * @inheritDoc
+     */
+
+    this.schemaLocation = options.schemaLocation ? options.schemaLocation : schemaLocation;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.hasZ = options.hasZ !== undefined ? options.hasZ : false;
+  }
+
+  if (GMLBase) GML3.__proto__ = GMLBase;
+  GML3.prototype = Object.create(GMLBase && GMLBase.prototype);
+  GML3.prototype.constructor = GML3;
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {MultiLineString|undefined} MultiLineString.
+   */
+
+  GML3.prototype.readMultiCurve_ = function readMultiCurve_(node, objectStack) {
+    /** @type {Array<LineString>} */
+    var lineStrings = (0, _xml.pushParseAndPop)([], this.MULTICURVE_PARSERS_, node, objectStack, this);
+
+    if (lineStrings) {
+      var multiLineString = new _MultiLineString.default(lineStrings);
+      return multiLineString;
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {MultiPolygon|undefined} MultiPolygon.
+   */
+
+
+  GML3.prototype.readMultiSurface_ = function readMultiSurface_(node, objectStack) {
+    /** @type {Array<Polygon>} */
+    var polygons = (0, _xml.pushParseAndPop)([], this.MULTISURFACE_PARSERS_, node, objectStack, this);
+
+    if (polygons) {
+      return new _MultiPolygon.default(polygons);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GML3.prototype.curveMemberParser_ = function curveMemberParser_(node, objectStack) {
+    (0, _xml.parseNode)(this.CURVEMEMBER_PARSERS_, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GML3.prototype.surfaceMemberParser_ = function surfaceMemberParser_(node, objectStack) {
+    (0, _xml.parseNode)(this.SURFACEMEMBER_PARSERS_, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<(Array<number>)>|undefined} flat coordinates.
+   */
+
+
+  GML3.prototype.readPatch_ = function readPatch_(node, objectStack) {
+    return (0, _xml.pushParseAndPop)([null], this.PATCHES_PARSERS_, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<number>|undefined} flat coordinates.
+   */
+
+
+  GML3.prototype.readSegment_ = function readSegment_(node, objectStack) {
+    return (0, _xml.pushParseAndPop)([null], this.SEGMENTS_PARSERS_, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<(Array<number>)>|undefined} flat coordinates.
+   */
+
+
+  GML3.prototype.readPolygonPatch_ = function readPolygonPatch_(node, objectStack) {
+    return (0, _xml.pushParseAndPop)([null], this.FLAT_LINEAR_RINGS_PARSERS, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<number>|undefined} flat coordinates.
+   */
+
+
+  GML3.prototype.readLineStringSegment_ = function readLineStringSegment_(node, objectStack) {
+    return (0, _xml.pushParseAndPop)([null], this.GEOMETRY_FLAT_COORDINATES_PARSERS, node, objectStack, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GML3.prototype.interiorParser_ = function interiorParser_(node, objectStack) {
+    /** @type {Array<number>|undefined} */
+    var flatLinearRing = (0, _xml.pushParseAndPop)(undefined, this.RING_PARSERS, node, objectStack, this);
+
+    if (flatLinearRing) {
+      var flatLinearRings =
+      /** @type {Array<Array<number>>} */
+      objectStack[objectStack.length - 1];
+      flatLinearRings.push(flatLinearRing);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GML3.prototype.exteriorParser_ = function exteriorParser_(node, objectStack) {
+    /** @type {Array<number>|undefined} */
+    var flatLinearRing = (0, _xml.pushParseAndPop)(undefined, this.RING_PARSERS, node, objectStack, this);
+
+    if (flatLinearRing) {
+      var flatLinearRings =
+      /** @type {Array<Array<number>>} */
+      objectStack[objectStack.length - 1];
+      flatLinearRings[0] = flatLinearRing;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Polygon|undefined} Polygon.
+   */
+
+
+  GML3.prototype.readSurface_ = function readSurface_(node, objectStack) {
+    /** @type {Array<Array<number>>} */
+    var flatLinearRings = (0, _xml.pushParseAndPop)([null], this.SURFACE_PARSERS_, node, objectStack, this);
+
+    if (flatLinearRings && flatLinearRings[0]) {
+      var flatCoordinates = flatLinearRings[0];
+      var ends = [flatCoordinates.length];
+      var i, ii;
+
+      for (i = 1, ii = flatLinearRings.length; i < ii; ++i) {
+        (0, _array.extend)(flatCoordinates, flatLinearRings[i]);
+        ends.push(flatCoordinates.length);
+      }
+
+      return new _Polygon.default(flatCoordinates, _GeometryLayout.default.XYZ, ends);
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {LineString|undefined} LineString.
+   */
+
+
+  GML3.prototype.readCurve_ = function readCurve_(node, objectStack) {
+    /** @type {Array<number>} */
+    var flatCoordinates = (0, _xml.pushParseAndPop)([null], this.CURVE_PARSERS_, node, objectStack, this);
+
+    if (flatCoordinates) {
+      var lineString = new _LineString.default(flatCoordinates, _GeometryLayout.default.XYZ);
+      return lineString;
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {import("../extent.js").Extent|undefined} Envelope.
+   */
+
+
+  GML3.prototype.readEnvelope_ = function readEnvelope_(node, objectStack) {
+    /** @type {Array<number>} */
+    var flatCoordinates = (0, _xml.pushParseAndPop)([null], this.ENVELOPE_PARSERS_, node, objectStack, this);
+    return (0, _extent.createOrUpdate)(flatCoordinates[1][0], flatCoordinates[1][1], flatCoordinates[2][0], flatCoordinates[2][1]);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<number>|undefined} Flat coordinates.
+   */
+
+
+  GML3.prototype.readFlatPos_ = function readFlatPos_(node, objectStack) {
+    var s = (0, _xml.getAllTextContent)(node, false);
+    var re = /^\s*([+\-]?\d*\.?\d+(?:[eE][+\-]?\d+)?)\s*/;
+    /** @type {Array<number>} */
+
+    var flatCoordinates = [];
+    var m;
+
+    while (m = re.exec(s)) {
+      flatCoordinates.push(parseFloat(m[1]));
+      s = s.substr(m[0].length);
+    }
+
+    if (s !== '') {
+      return undefined;
+    }
+
+    var context = objectStack[0];
+    var containerSrs = context['srsName'];
+    var axisOrientation = 'enu';
+
+    if (containerSrs) {
+      var proj = (0, _proj.get)(containerSrs);
+      axisOrientation = proj.getAxisOrientation();
+    }
+
+    if (axisOrientation === 'neu') {
+      var i, ii;
+
+      for (i = 0, ii = flatCoordinates.length; i < ii; i += 3) {
+        var y = flatCoordinates[i];
+        var x = flatCoordinates[i + 1];
+        flatCoordinates[i] = x;
+        flatCoordinates[i + 1] = y;
+      }
+    }
+
+    var len = flatCoordinates.length;
+
+    if (len == 2) {
+      flatCoordinates.push(0);
+    }
+
+    if (len === 0) {
+      return undefined;
+    }
+
+    return flatCoordinates;
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<number>|undefined} Flat coordinates.
+   */
+
+
+  GML3.prototype.readFlatPosList_ = function readFlatPosList_(node, objectStack) {
+    var s = (0, _xml.getAllTextContent)(node, false).replace(/^\s*|\s*$/g, '');
+    var context = objectStack[0];
+    var containerSrs = context['srsName'];
+    var contextDimension = context['srsDimension'];
+    var axisOrientation = 'enu';
+
+    if (containerSrs) {
+      var proj = (0, _proj.get)(containerSrs);
+      axisOrientation = proj.getAxisOrientation();
+    }
+
+    var coords = s.split(/\s+/); // The "dimension" attribute is from the GML 3.0.1 spec.
+
+    var dim = 2;
+
+    if (node.getAttribute('srsDimension')) {
+      dim = (0, _xsd.readNonNegativeIntegerString)(node.getAttribute('srsDimension'));
+    } else if (node.getAttribute('dimension')) {
+      dim = (0, _xsd.readNonNegativeIntegerString)(node.getAttribute('dimension'));
+    } else if (
+    /** @type {Element} */
+    node.parentNode.getAttribute('srsDimension')) {
+      dim = (0, _xsd.readNonNegativeIntegerString)(
+      /** @type {Element} */
+      node.parentNode.getAttribute('srsDimension'));
+    } else if (contextDimension) {
+      dim = (0, _xsd.readNonNegativeIntegerString)(contextDimension);
+    }
+
+    var x, y, z;
+    var flatCoordinates = [];
+
+    for (var i = 0, ii = coords.length; i < ii; i += dim) {
+      x = parseFloat(coords[i]);
+      y = parseFloat(coords[i + 1]);
+      z = dim === 3 ? parseFloat(coords[i + 2]) : 0;
+
+      if (axisOrientation.substr(0, 2) === 'en') {
+        flatCoordinates.push(x, y, z);
+      } else {
+        flatCoordinates.push(y, x, z);
+      }
+    }
+
+    return flatCoordinates;
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/Point.js").default} value Point geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writePos_ = function writePos_(node, value, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsDimension = hasZ ? '3' : '2';
+    node.setAttribute('srsDimension', srsDimension);
+    var srsName = context['srsName'];
+    var axisOrientation = 'enu';
+
+    if (srsName) {
+      axisOrientation = (0, _proj.get)(srsName).getAxisOrientation();
+    }
+
+    var point = value.getCoordinates();
+    var coords; // only 2d for simple features profile
+
+    if (axisOrientation.substr(0, 2) === 'en') {
+      coords = point[0] + ' ' + point[1];
+    } else {
+      coords = point[1] + ' ' + point[0];
+    }
+
+    if (hasZ) {
+      // For newly created points, Z can be undefined.
+      var z = point[2] || 0;
+      coords += ' ' + z;
+    }
+
+    (0, _xsd.writeStringTextNode)(node, coords);
+  };
+  /**
+   * @param {Array<number>} point Point geometry.
+   * @param {string=} opt_srsName Optional srsName
+   * @param {boolean=} opt_hasZ whether the geometry has a Z coordinate (is 3D) or not.
+   * @return {string} The coords string.
+   * @private
+   */
+
+
+  GML3.prototype.getCoords_ = function getCoords_(point, opt_srsName, opt_hasZ) {
+    var axisOrientation = 'enu';
+
+    if (opt_srsName) {
+      axisOrientation = (0, _proj.get)(opt_srsName).getAxisOrientation();
+    }
+
+    var coords = axisOrientation.substr(0, 2) === 'en' ? point[0] + ' ' + point[1] : point[1] + ' ' + point[0];
+
+    if (opt_hasZ) {
+      // For newly created points, Z can be undefined.
+      var z = point[2] || 0;
+      coords += ' ' + z;
+    }
+
+    return coords;
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {LineString|import("../geom/LinearRing.js").default} value Geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writePosList_ = function writePosList_(node, value, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsDimension = hasZ ? '3' : '2';
+    node.setAttribute('srsDimension', srsDimension);
+    var srsName = context['srsName']; // only 2d for simple features profile
+
+    var points = value.getCoordinates();
+    var len = points.length;
+    var parts = new Array(len);
+    var point;
+
+    for (var i = 0; i < len; ++i) {
+      point = points[i];
+      parts[i] = this.getCoords_(point, srsName, hasZ);
+    }
+
+    (0, _xsd.writeStringTextNode)(node, parts.join(' '));
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/Point.js").default} geometry Point geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writePoint_ = function writePoint_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var srsName = context['srsName'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var pos = (0, _xml.createElementNS)(node.namespaceURI, 'pos');
+    node.appendChild(pos);
+    this.writePos_(pos, geometry, objectStack);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {Array<*>} objectStack Node stack.
+   */
+
+
+  GML3.prototype.writeEnvelope = function writeEnvelope(node, extent, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var srsName = context['srsName'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var keys = ['lowerCorner', 'upperCorner'];
+    var values = [extent[0] + ' ' + extent[1], extent[2] + ' ' + extent[3]];
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    {
+      node: node
+    }, this.ENVELOPE_SERIALIZERS_, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, keys, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/LinearRing.js").default} geometry LinearRing geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeLinearRing_ = function writeLinearRing_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var srsName = context['srsName'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var posList = (0, _xml.createElementNS)(node.namespaceURI, 'posList');
+    node.appendChild(posList);
+    this.writePosList_(posList, geometry, objectStack);
+  };
+  /**
+   * @param {*} value Value.
+   * @param {Array<*>} objectStack Object stack.
+   * @param {string=} opt_nodeName Node name.
+   * @return {Node} Node.
+   * @private
+   */
+
+
+  GML3.prototype.RING_NODE_FACTORY_ = function RING_NODE_FACTORY_(value, objectStack, opt_nodeName) {
+    var context = objectStack[objectStack.length - 1];
+    var parentNode = context.node;
+    var exteriorWritten = context['exteriorWritten'];
+
+    if (exteriorWritten === undefined) {
+      context['exteriorWritten'] = true;
+    }
+
+    return (0, _xml.createElementNS)(parentNode.namespaceURI, exteriorWritten !== undefined ? 'interior' : 'exterior');
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Polygon} geometry Polygon geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeSurfaceOrPolygon_ = function writeSurfaceOrPolygon_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName'];
+
+    if (node.nodeName !== 'PolygonPatch' && srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    if (node.nodeName === 'Polygon' || node.nodeName === 'PolygonPatch') {
+      var rings = geometry.getLinearRings();
+      (0, _xml.pushSerializeAndPop)({
+        node: node,
+        hasZ: hasZ,
+        srsName: srsName
+      }, this.RING_SERIALIZERS_, this.RING_NODE_FACTORY_, rings, objectStack, undefined, this);
+    } else if (node.nodeName === 'Surface') {
+      var patches = (0, _xml.createElementNS)(node.namespaceURI, 'patches');
+      node.appendChild(patches);
+      this.writeSurfacePatches_(patches, geometry, objectStack);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {LineString} geometry LineString geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeCurveOrLineString_ = function writeCurveOrLineString_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var srsName = context['srsName'];
+
+    if (node.nodeName !== 'LineStringSegment' && srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    if (node.nodeName === 'LineString' || node.nodeName === 'LineStringSegment') {
+      var posList = (0, _xml.createElementNS)(node.namespaceURI, 'posList');
+      node.appendChild(posList);
+      this.writePosList_(posList, geometry, objectStack);
+    } else if (node.nodeName === 'Curve') {
+      var segments = (0, _xml.createElementNS)(node.namespaceURI, 'segments');
+      node.appendChild(segments);
+      this.writeCurveSegments_(segments, geometry, objectStack);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {MultiPolygon} geometry MultiPolygon geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeMultiSurfaceOrPolygon_ = function writeMultiSurfaceOrPolygon_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName'];
+    var surface = context['surface'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var polygons = geometry.getPolygons();
+    (0, _xml.pushSerializeAndPop)({
+      node: node,
+      hasZ: hasZ,
+      srsName: srsName,
+      surface: surface
+    }, this.SURFACEORPOLYGONMEMBER_SERIALIZERS_, this.MULTIGEOMETRY_MEMBER_NODE_FACTORY_, polygons, objectStack, undefined, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/MultiPoint.js").default} geometry MultiPoint geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeMultiPoint_ = function writeMultiPoint_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var srsName = context['srsName'];
+    var hasZ = context['hasZ'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var points = geometry.getPoints();
+    (0, _xml.pushSerializeAndPop)({
+      node: node,
+      hasZ: hasZ,
+      srsName: srsName
+    }, this.POINTMEMBER_SERIALIZERS_, (0, _xml.makeSimpleNodeFactory)('pointMember'), points, objectStack, undefined, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {MultiLineString} geometry MultiLineString geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeMultiCurveOrLineString_ = function writeMultiCurveOrLineString_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName'];
+    var curve = context['curve'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var lines = geometry.getLineStrings();
+    (0, _xml.pushSerializeAndPop)({
+      node: node,
+      hasZ: hasZ,
+      srsName: srsName,
+      curve: curve
+    }, this.LINESTRINGORCURVEMEMBER_SERIALIZERS_, this.MULTIGEOMETRY_MEMBER_NODE_FACTORY_, lines, objectStack, undefined, this);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/LinearRing.js").default} ring LinearRing geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeRing_ = function writeRing_(node, ring, objectStack) {
+    var linearRing = (0, _xml.createElementNS)(node.namespaceURI, 'LinearRing');
+    node.appendChild(linearRing);
+    this.writeLinearRing_(linearRing, ring, objectStack);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {Polygon} polygon Polygon geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeSurfaceOrPolygonMember_ = function writeSurfaceOrPolygonMember_(node, polygon, objectStack) {
+    var child = this.GEOMETRY_NODE_FACTORY_(polygon, objectStack);
+
+    if (child) {
+      node.appendChild(child);
+      this.writeSurfaceOrPolygon_(child, polygon, objectStack);
+    }
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/Point.js").default} point Point geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writePointMember_ = function writePointMember_(node, point, objectStack) {
+    var child = (0, _xml.createElementNS)(node.namespaceURI, 'Point');
+    node.appendChild(child);
+    this.writePoint_(child, point, objectStack);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {LineString} line LineString geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeLineStringOrCurveMember_ = function writeLineStringOrCurveMember_(node, line, objectStack) {
+    var child = this.GEOMETRY_NODE_FACTORY_(line, objectStack);
+
+    if (child) {
+      node.appendChild(child);
+      this.writeCurveOrLineString_(child, line, objectStack);
+    }
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {Polygon} polygon Polygon geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeSurfacePatches_ = function writeSurfacePatches_(node, polygon, objectStack) {
+    var child = (0, _xml.createElementNS)(node.namespaceURI, 'PolygonPatch');
+    node.appendChild(child);
+    this.writeSurfaceOrPolygon_(child, polygon, objectStack);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {LineString} line LineString geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeCurveSegments_ = function writeCurveSegments_(node, line, objectStack) {
+    var child = (0, _xml.createElementNS)(node.namespaceURI, 'LineStringSegment');
+    node.appendChild(child);
+    this.writeCurveOrLineString_(child, line, objectStack);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/Geometry.js").default|import("../extent.js").Extent} geometry Geometry.
+   * @param {Array<*>} objectStack Node stack.
+   */
+
+
+  GML3.prototype.writeGeometryElement = function writeGeometryElement(node, geometry, objectStack) {
+    var context =
+    /** @type {import("./Feature.js").WriteOptions} */
+    objectStack[objectStack.length - 1];
+    var item = (0, _obj.assign)({}, context);
+    item['node'] = node;
+    var value;
+
+    if (Array.isArray(geometry)) {
+      if (context.dataProjection) {
+        value = (0, _proj.transformExtent)(geometry, context.featureProjection, context.dataProjection);
+      } else {
+        value = geometry;
+      }
+    } else {
+      value = (0, _Feature.transformWithOptions)(
+      /** @type {import("../geom/Geometry.js").default} */
+      geometry, true, context);
+    }
+
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    item, this.GEOMETRY_SERIALIZERS_, this.GEOMETRY_NODE_FACTORY_, [value], objectStack, undefined, this);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {Array<*>} objectStack Node stack.
+   */
+
+
+  GML3.prototype.writeFeatureElement = function writeFeatureElement(node, feature, objectStack) {
+    var fid = feature.getId();
+
+    if (fid) {
+      node.setAttribute('fid',
+      /** @type {string} */
+      fid);
+    }
+
+    var context =
+    /** @type {Object} */
+    objectStack[objectStack.length - 1];
+    var featureNS = context['featureNS'];
+    var geometryName = feature.getGeometryName();
+
+    if (!context.serializers) {
+      context.serializers = {};
+      context.serializers[featureNS] = {};
+    }
+
+    var properties = feature.getProperties();
+    var keys = [];
+    var values = [];
+
+    for (var key in properties) {
+      var value = properties[key];
+
+      if (value !== null) {
+        keys.push(key);
+        values.push(value);
+
+        if (key == geometryName || typeof
+        /** @type {?} */
+        value.getSimplifiedGeometry === 'function') {
+          if (!(key in context.serializers[featureNS])) {
+            context.serializers[featureNS][key] = (0, _xml.makeChildAppender)(this.writeGeometryElement, this);
+          }
+        } else {
+          if (!(key in context.serializers[featureNS])) {
+            context.serializers[featureNS][key] = (0, _xml.makeChildAppender)(_xsd.writeStringTextNode);
+          }
+        }
+      }
+    }
+
+    var item = (0, _obj.assign)({}, context);
+    item.node = node;
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    item, context.serializers, (0, _xml.makeSimpleNodeFactory)(undefined, featureNS), values, objectStack, keys);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML3.prototype.writeFeatureMembers_ = function writeFeatureMembers_(node, features, objectStack) {
+    var context =
+    /** @type {Object} */
+    objectStack[objectStack.length - 1];
+    var featureType = context['featureType'];
+    var featureNS = context['featureNS'];
+    /** @type {Object<string, Object<string, import("../xml.js").Serializer>>} */
+
+    var serializers = {};
+    serializers[featureNS] = {};
+    serializers[featureNS][featureType] = (0, _xml.makeChildAppender)(this.writeFeatureElement, this);
+    var item = (0, _obj.assign)({}, context);
+    item.node = node;
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    item, serializers, (0, _xml.makeSimpleNodeFactory)(featureType, featureNS), features, objectStack);
+  };
+  /**
+   * @const
+   * @param {*} value Value.
+   * @param {Array<*>} objectStack Object stack.
+   * @param {string=} opt_nodeName Node name.
+   * @return {Node|undefined} Node.
+   * @private
+   */
+
+
+  GML3.prototype.MULTIGEOMETRY_MEMBER_NODE_FACTORY_ = function MULTIGEOMETRY_MEMBER_NODE_FACTORY_(value, objectStack, opt_nodeName) {
+    var parentNode = objectStack[objectStack.length - 1].node;
+    return (0, _xml.createElementNS)(this.namespace, MULTIGEOMETRY_TO_MEMBER_NODENAME[parentNode.nodeName]);
+  };
+  /**
+   * @const
+   * @param {*} value Value.
+   * @param {Array<*>} objectStack Object stack.
+   * @param {string=} opt_nodeName Node name.
+   * @return {Element|undefined} Node.
+   * @private
+   */
+
+
+  GML3.prototype.GEOMETRY_NODE_FACTORY_ = function GEOMETRY_NODE_FACTORY_(value, objectStack, opt_nodeName) {
+    var context = objectStack[objectStack.length - 1];
+    var multiSurface = context['multiSurface'];
+    var surface = context['surface'];
+    var curve = context['curve'];
+    var multiCurve = context['multiCurve'];
+    var nodeName;
+
+    if (!Array.isArray(value)) {
+      nodeName =
+      /** @type {import("../geom/Geometry.js").default} */
+      value.getType();
+
+      if (nodeName === 'MultiPolygon' && multiSurface === true) {
+        nodeName = 'MultiSurface';
+      } else if (nodeName === 'Polygon' && surface === true) {
+        nodeName = 'Surface';
+      } else if (nodeName === 'LineString' && curve === true) {
+        nodeName = 'Curve';
+      } else if (nodeName === 'MultiLineString' && multiCurve === true) {
+        nodeName = 'MultiCurve';
+      }
+    } else {
+      nodeName = 'Envelope';
+    }
+
+    return (0, _xml.createElementNS)(this.namespace, nodeName);
+  };
+  /**
+   * Encode a geometry in GML 3.1.1 Simple Features.
+   *
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+   * @return {Node} Node.
+   * @override
+   * @api
+   */
+
+
+  GML3.prototype.writeGeometryNode = function writeGeometryNode(geometry, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    var geom = (0, _xml.createElementNS)(this.namespace, 'geom');
+    var context = {
+      node: geom,
+      hasZ: this.hasZ,
+      srsName: this.srsName,
+      curve: this.curve_,
+      surface: this.surface_,
+      multiSurface: this.multiSurface_,
+      multiCurve: this.multiCurve_
+    };
+
+    if (opt_options) {
+      (0, _obj.assign)(context, opt_options);
+    }
+
+    this.writeGeometryElement(geom, geometry, [context]);
+    return geom;
+  };
+  /**
+   * Encode an array of features in the GML 3.1.1 format as an XML node.
+   *
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+   * @return {Element} Node.
+   * @override
+   * @api
+   */
+
+
+  GML3.prototype.writeFeaturesNode = function writeFeaturesNode(features, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    var node = (0, _xml.createElementNS)(this.namespace, 'featureMembers');
+    node.setAttributeNS(_xml.XML_SCHEMA_INSTANCE_URI, 'xsi:schemaLocation', this.schemaLocation);
+    var context = {
+      srsName: this.srsName,
+      hasZ: this.hasZ,
+      curve: this.curve_,
+      surface: this.surface_,
+      multiSurface: this.multiSurface_,
+      multiCurve: this.multiCurve_,
+      featureNS: this.featureNS,
+      featureType: this.featureType
+    };
+
+    if (opt_options) {
+      (0, _obj.assign)(context, opt_options);
+    }
+
+    this.writeFeatureMembers_(node, features, [context]);
+    return node;
+  };
+
+  return GML3;
+}(_GMLBase.default);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+
+GML3.prototype.GEOMETRY_FLAT_COORDINATES_PARSERS = {
+  'http://www.opengis.net/gml': {
+    'pos': (0, _xml.makeReplacer)(GML3.prototype.readFlatPos_),
+    'posList': (0, _xml.makeReplacer)(GML3.prototype.readFlatPosList_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+GML3.prototype.FLAT_LINEAR_RINGS_PARSERS = {
+  'http://www.opengis.net/gml': {
+    'interior': GML3.prototype.interiorParser_,
+    'exterior': GML3.prototype.exteriorParser_
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+GML3.prototype.GEOMETRY_PARSERS = {
+  'http://www.opengis.net/gml': {
+    'Point': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readPoint),
+    'MultiPoint': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readMultiPoint),
+    'LineString': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readLineString),
+    'MultiLineString': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readMultiLineString),
+    'LinearRing': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readLinearRing),
+    'Polygon': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readPolygon),
+    'MultiPolygon': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readMultiPolygon),
+    'Surface': (0, _xml.makeReplacer)(GML3.prototype.readSurface_),
+    'MultiSurface': (0, _xml.makeReplacer)(GML3.prototype.readMultiSurface_),
+    'Curve': (0, _xml.makeReplacer)(GML3.prototype.readCurve_),
+    'MultiCurve': (0, _xml.makeReplacer)(GML3.prototype.readMultiCurve_),
+    'Envelope': (0, _xml.makeReplacer)(GML3.prototype.readEnvelope_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.MULTICURVE_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'curveMember': (0, _xml.makeArrayPusher)(GML3.prototype.curveMemberParser_),
+    'curveMembers': (0, _xml.makeArrayPusher)(GML3.prototype.curveMemberParser_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.MULTISURFACE_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'surfaceMember': (0, _xml.makeArrayPusher)(GML3.prototype.surfaceMemberParser_),
+    'surfaceMembers': (0, _xml.makeArrayPusher)(GML3.prototype.surfaceMemberParser_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.CURVEMEMBER_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'LineString': (0, _xml.makeArrayPusher)(_GMLBase.default.prototype.readLineString),
+    'Curve': (0, _xml.makeArrayPusher)(GML3.prototype.readCurve_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.SURFACEMEMBER_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'Polygon': (0, _xml.makeArrayPusher)(_GMLBase.default.prototype.readPolygon),
+    'Surface': (0, _xml.makeArrayPusher)(GML3.prototype.readSurface_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.SURFACE_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'patches': (0, _xml.makeReplacer)(GML3.prototype.readPatch_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.CURVE_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'segments': (0, _xml.makeReplacer)(GML3.prototype.readSegment_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.ENVELOPE_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'lowerCorner': (0, _xml.makeArrayPusher)(GML3.prototype.readFlatPosList_),
+    'upperCorner': (0, _xml.makeArrayPusher)(GML3.prototype.readFlatPosList_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.PATCHES_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'PolygonPatch': (0, _xml.makeReplacer)(GML3.prototype.readPolygonPatch_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML3.prototype.SEGMENTS_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'LineStringSegment': (0, _xml.makeReplacer)(GML3.prototype.readLineStringSegment_)
+  }
+};
+/**
+ * Encode an array of features in GML 3.1.1 Simple Features.
+ *
+ * @function
+ * @param {Array<import("../Feature.js").default>} features Features.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+ * @return {string} Result.
+ * @api
+ */
+
+GML3.prototype.writeFeatures;
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML3.prototype.RING_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'exterior': (0, _xml.makeChildAppender)(GML3.prototype.writeRing_),
+    'interior': (0, _xml.makeChildAppender)(GML3.prototype.writeRing_)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML3.prototype.ENVELOPE_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'lowerCorner': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+    'upperCorner': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML3.prototype.SURFACEORPOLYGONMEMBER_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'surfaceMember': (0, _xml.makeChildAppender)(GML3.prototype.writeSurfaceOrPolygonMember_),
+    'polygonMember': (0, _xml.makeChildAppender)(GML3.prototype.writeSurfaceOrPolygonMember_)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML3.prototype.POINTMEMBER_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'pointMember': (0, _xml.makeChildAppender)(GML3.prototype.writePointMember_)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML3.prototype.LINESTRINGORCURVEMEMBER_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'lineStringMember': (0, _xml.makeChildAppender)(GML3.prototype.writeLineStringOrCurveMember_),
+    'curveMember': (0, _xml.makeChildAppender)(GML3.prototype.writeLineStringOrCurveMember_)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML3.prototype.GEOMETRY_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'Curve': (0, _xml.makeChildAppender)(GML3.prototype.writeCurveOrLineString_),
+    'MultiCurve': (0, _xml.makeChildAppender)(GML3.prototype.writeMultiCurveOrLineString_),
+    'Point': (0, _xml.makeChildAppender)(GML3.prototype.writePoint_),
+    'MultiPoint': (0, _xml.makeChildAppender)(GML3.prototype.writeMultiPoint_),
+    'LineString': (0, _xml.makeChildAppender)(GML3.prototype.writeCurveOrLineString_),
+    'MultiLineString': (0, _xml.makeChildAppender)(GML3.prototype.writeMultiCurveOrLineString_),
+    'LinearRing': (0, _xml.makeChildAppender)(GML3.prototype.writeLinearRing_),
+    'Polygon': (0, _xml.makeChildAppender)(GML3.prototype.writeSurfaceOrPolygon_),
+    'MultiPolygon': (0, _xml.makeChildAppender)(GML3.prototype.writeMultiSurfaceOrPolygon_),
+    'Surface': (0, _xml.makeChildAppender)(GML3.prototype.writeSurfaceOrPolygon_),
+    'MultiSurface': (0, _xml.makeChildAppender)(GML3.prototype.writeMultiSurfaceOrPolygon_),
+    'Envelope': (0, _xml.makeChildAppender)(GML3.prototype.writeEnvelope)
+  }
+};
+var _default = GML3;
+exports.default = _default;
+},{"../array.js":"../node_modules/ol/array.js","../extent.js":"../node_modules/ol/extent.js","./Feature.js":"../node_modules/ol/format/Feature.js","./GMLBase.js":"../node_modules/ol/format/GMLBase.js","./xsd.js":"../node_modules/ol/format/xsd.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/MultiPolygon.js":"../node_modules/ol/geom/MultiPolygon.js","../geom/Polygon.js":"../node_modules/ol/geom/Polygon.js","../obj.js":"../node_modules/ol/obj.js","../proj.js":"../node_modules/ol/proj.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/GML.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _GML = _interopRequireDefault(require("./GML3.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/GML
+ */
+
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the GML format
+ * version 3.1.1.
+ * Currently only supports GML 3.1.1 Simple Features profile.
+ *
+ * @param {import("./GMLBase.js").Options=} opt_options
+ *     Optional configuration object.
+ * @api
+ */
+var GML = _GML.default;
+/**
+ * Encode an array of features in GML 3.1.1 Simple Features.
+ *
+ * @function
+ * @param {Array<import("../Feature.js").default>} features Features.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+ * @return {string} Result.
+ * @api
+ */
+
+GML.prototype.writeFeatures;
+/**
+ * Encode an array of features in the GML 3.1.1 format as an XML node.
+ *
+ * @function
+ * @param {Array<import("../Feature.js").default>} features Features.
+ * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+ * @return {Node} Node.
+ * @api
+ */
+
+GML.prototype.writeFeaturesNode;
+var _default = GML;
+exports.default = _default;
+},{"./GML3.js":"../node_modules/ol/format/GML3.js"}],"../node_modules/ol/format/GPX.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _array = require("../array.js");
+
+var _Feature2 = require("./Feature.js");
+
+var _XMLFeature = _interopRequireDefault(require("./XMLFeature.js"));
+
+var _xsd = require("./xsd.js");
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _GeometryType = _interopRequireDefault(require("../geom/GeometryType.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _proj = require("../proj.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/GPX
+ */
+
+/**
+ * @const
+ * @type {Array<null|string>}
+ */
+var NAMESPACE_URIS = [null, 'http://www.topografix.com/GPX/1/0', 'http://www.topografix.com/GPX/1/1'];
+/**
+ * @const
+ * @type {string}
+ */
+
+var SCHEMA_LOCATION = 'http://www.topografix.com/GPX/1/1 ' + 'http://www.topografix.com/GPX/1/1/gpx.xsd';
+/**
+ * @const
+ * @type {Object<string, function(Node, Array<*>): (Feature|undefined)>}
+ */
+
+var FEATURE_READER = {
+  'rte': readRte,
+  'trk': readTrk,
+  'wpt': readWpt
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var GPX_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'rte': (0, _xml.makeArrayPusher)(readRte),
+  'trk': (0, _xml.makeArrayPusher)(readTrk),
+  'wpt': (0, _xml.makeArrayPusher)(readWpt)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var LINK_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'text': (0, _xml.makeObjectPropertySetter)(_xsd.readString, 'linkText'),
+  'type': (0, _xml.makeObjectPropertySetter)(_xsd.readString, 'linkType')
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var GPX_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'rte': (0, _xml.makeChildAppender)(writeRte),
+  'trk': (0, _xml.makeChildAppender)(writeTrk),
+  'wpt': (0, _xml.makeChildAppender)(writeWpt)
+});
+/**
+ * @typedef {Object} Options
+ * @property {function(Feature, Node)} [readExtensions] Callback function
+ * to process `extensions` nodes. To prevent memory leaks, this callback function must
+ * not store any references to the node. Note that the `extensions`
+ * node is not allowed in GPX 1.0. Moreover, only `extensions`
+ * nodes from `wpt`, `rte` and `trk` can be processed, as those are
+ * directly mapped to a feature.
+ */
+
+/**
+ * @typedef {Object} LayoutOptions
+ * @property {boolean} [hasZ]
+ * @property {boolean} [hasM]
+ */
+
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the GPX format.
+ *
+ * Note that {@link module:ol/format/GPX~GPX#readFeature} only reads the first
+ * feature of the source.
+ *
+ * When reading, routes (`<rte>`) are converted into LineString geometries, and
+ * tracks (`<trk>`) into MultiLineString. Any properties on route and track
+ * waypoints are ignored.
+ *
+ * When writing, LineString geometries are output as routes (`<rte>`), and
+ * MultiLineString as tracks (`<trk>`).
+ *
+ * @api
+ */
+
+var GPX =
+/*@__PURE__*/
+function (XMLFeature) {
+  function GPX(opt_options) {
+    XMLFeature.call(this);
+    var options = opt_options ? opt_options : {};
+    /**
+     * @inheritDoc
+     */
+
+    this.dataProjection = (0, _proj.get)('EPSG:4326');
+    /**
+     * @type {function(Feature, Node)|undefined}
+     * @private
+     */
+
+    this.readExtensions_ = options.readExtensions;
+  }
+
+  if (XMLFeature) GPX.__proto__ = XMLFeature;
+  GPX.prototype = Object.create(XMLFeature && XMLFeature.prototype);
+  GPX.prototype.constructor = GPX;
+  /**
+   * @param {Array<Feature>} features List of features.
+   * @private
+   */
+
+  GPX.prototype.handleReadExtensions_ = function handleReadExtensions_(features) {
+    if (!features) {
+      features = [];
+    }
+
+    for (var i = 0, ii = features.length; i < ii; ++i) {
+      var feature = features[i];
+
+      if (this.readExtensions_) {
+        var extensionsNode = feature.get('extensionsNode_') || null;
+        this.readExtensions_(feature, extensionsNode);
+      }
+
+      feature.set('extensionsNode_', undefined);
+    }
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GPX.prototype.readFeatureFromNode = function readFeatureFromNode(node, opt_options) {
+    if (!(0, _array.includes)(NAMESPACE_URIS, node.namespaceURI)) {
+      return null;
+    }
+
+    var featureReader = FEATURE_READER[node.localName];
+
+    if (!featureReader) {
+      return null;
+    }
+
+    var feature = featureReader(node, [this.getReadOptions(node, opt_options)]);
+
+    if (!feature) {
+      return null;
+    }
+
+    this.handleReadExtensions_([feature]);
+    return feature;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  GPX.prototype.readFeaturesFromNode = function readFeaturesFromNode(node, opt_options) {
+    if (!(0, _array.includes)(NAMESPACE_URIS, node.namespaceURI)) {
+      return [];
+    }
+
+    if (node.localName == 'gpx') {
+      /** @type {Array<Feature>} */
+      var features = (0, _xml.pushParseAndPop)([], GPX_PARSERS, node, [this.getReadOptions(node, opt_options)]);
+
+      if (features) {
+        this.handleReadExtensions_(features);
+        return features;
+      } else {
+        return [];
+      }
+    }
+
+    return [];
+  };
+  /**
+   * Encode an array of features in the GPX format as an XML node.
+   * LineString geometries are output as routes (`<rte>`), and MultiLineString
+   * as tracks (`<trk>`).
+   *
+   * @param {Array<Feature>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+   * @return {Node} Node.
+   * @override
+   * @api
+   */
+
+
+  GPX.prototype.writeFeaturesNode = function writeFeaturesNode(features, opt_options) {
+    opt_options = this.adaptOptions(opt_options); //FIXME Serialize metadata
+
+    var gpx = (0, _xml.createElementNS)('http://www.topografix.com/GPX/1/1', 'gpx');
+    var xmlnsUri = 'http://www.w3.org/2000/xmlns/';
+    gpx.setAttributeNS(xmlnsUri, 'xmlns:xsi', _xml.XML_SCHEMA_INSTANCE_URI);
+    gpx.setAttributeNS(_xml.XML_SCHEMA_INSTANCE_URI, 'xsi:schemaLocation', SCHEMA_LOCATION);
+    gpx.setAttribute('version', '1.1');
+    gpx.setAttribute('creator', 'OpenLayers');
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    {
+      node: gpx
+    }, GPX_SERIALIZERS, GPX_NODE_FACTORY, features, [opt_options]);
+    return gpx;
+  };
+
+  return GPX;
+}(_XMLFeature.default);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var RTE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'name': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'cmt': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'desc': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'src': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'link': parseLink,
+  'number': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'extensions': parseExtensions,
+  'type': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'rtept': parseRtePt
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var RTEPT_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ele': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'time': (0, _xml.makeObjectPropertySetter)(_xsd.readDateTime)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TRK_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'name': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'cmt': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'desc': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'src': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'link': parseLink,
+  'number': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'type': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'extensions': parseExtensions,
+  'trkseg': parseTrkSeg
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TRKSEG_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'trkpt': parseTrkPt
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TRKPT_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ele': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'time': (0, _xml.makeObjectPropertySetter)(_xsd.readDateTime)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var WPT_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ele': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'time': (0, _xml.makeObjectPropertySetter)(_xsd.readDateTime),
+  'magvar': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'geoidheight': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'name': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'cmt': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'desc': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'src': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'link': parseLink,
+  'sym': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'type': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'fix': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'sat': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'hdop': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'vdop': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'pdop': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'ageofdgpsdata': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'dgpsid': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'extensions': parseExtensions
+});
+/**
+ * @const
+ * @type {Array<string>}
+ */
+
+var LINK_SEQUENCE = ['text', 'type'];
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var LINK_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'text': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'type': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode)
+});
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+var RTE_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['name', 'cmt', 'desc', 'src', 'link', 'number', 'type', 'rtept']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var RTE_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'name': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'cmt': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'desc': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'src': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'link': (0, _xml.makeChildAppender)(writeLink),
+  'number': (0, _xml.makeChildAppender)(_xsd.writeNonNegativeIntegerTextNode),
+  'type': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'rtept': (0, _xml.makeArraySerializer)((0, _xml.makeChildAppender)(writeWptType))
+});
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+var RTEPT_TYPE_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['ele', 'time']);
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+var TRK_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['name', 'cmt', 'desc', 'src', 'link', 'number', 'type', 'trkseg']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var TRK_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'name': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'cmt': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'desc': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'src': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'link': (0, _xml.makeChildAppender)(writeLink),
+  'number': (0, _xml.makeChildAppender)(_xsd.writeNonNegativeIntegerTextNode),
+  'type': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'trkseg': (0, _xml.makeArraySerializer)((0, _xml.makeChildAppender)(writeTrkSeg))
+});
+/**
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+var TRKSEG_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('trkpt');
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var TRKSEG_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'trkpt': (0, _xml.makeChildAppender)(writeWptType)
+});
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+var WPT_TYPE_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['ele', 'time', 'magvar', 'geoidheight', 'name', 'cmt', 'desc', 'src', 'link', 'sym', 'type', 'fix', 'sat', 'hdop', 'vdop', 'pdop', 'ageofdgpsdata', 'dgpsid']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var WPT_TYPE_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ele': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'time': (0, _xml.makeChildAppender)(_xsd.writeDateTimeTextNode),
+  'magvar': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'geoidheight': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'name': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'cmt': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'desc': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'src': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'link': (0, _xml.makeChildAppender)(writeLink),
+  'sym': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'type': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'fix': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'sat': (0, _xml.makeChildAppender)(_xsd.writeNonNegativeIntegerTextNode),
+  'hdop': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'vdop': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'pdop': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'ageofdgpsdata': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'dgpsid': (0, _xml.makeChildAppender)(_xsd.writeNonNegativeIntegerTextNode)
+});
+/**
+ * @const
+ * @type {Object<string, string>}
+ */
+
+var GEOMETRY_TYPE_TO_NODENAME = {
+  'Point': 'wpt',
+  'LineString': 'rte',
+  'MultiLineString': 'trk'
+};
+/**
+ * @param {*} value Value.
+ * @param {Array<*>} objectStack Object stack.
+ * @param {string=} opt_nodeName Node name.
+ * @return {Node|undefined} Node.
+ */
+
+function GPX_NODE_FACTORY(value, objectStack, opt_nodeName) {
+  var geometry =
+  /** @type {Feature} */
+  value.getGeometry();
+
+  if (geometry) {
+    var nodeName = GEOMETRY_TYPE_TO_NODENAME[geometry.getType()];
+
+    if (nodeName) {
+      var parentNode = objectStack[objectStack.length - 1].node;
+      return (0, _xml.createElementNS)(parentNode.namespaceURI, nodeName);
+    }
+  }
+}
+/**
+ * @param {Array<number>} flatCoordinates Flat coordinates.
+ * @param {LayoutOptions} layoutOptions Layout options.
+ * @param {Element} node Node.
+ * @param {!Object} values Values.
+ * @return {Array<number>} Flat coordinates.
+ */
+
+
+function appendCoordinate(flatCoordinates, layoutOptions, node, values) {
+  flatCoordinates.push(parseFloat(node.getAttribute('lon')), parseFloat(node.getAttribute('lat')));
+
+  if ('ele' in values) {
+    flatCoordinates.push(
+    /** @type {number} */
+    values['ele']);
+    delete values['ele'];
+    layoutOptions.hasZ = true;
+  } else {
+    flatCoordinates.push(0);
+  }
+
+  if ('time' in values) {
+    flatCoordinates.push(
+    /** @type {number} */
+    values['time']);
+    delete values['time'];
+    layoutOptions.hasM = true;
+  } else {
+    flatCoordinates.push(0);
+  }
+
+  return flatCoordinates;
+}
+/**
+ * Choose GeometryLayout based on flags in layoutOptions and adjust flatCoordinates
+ * and ends arrays by shrinking them accordingly (removing unused zero entries).
+ *
+ * @param {LayoutOptions} layoutOptions Layout options.
+ * @param {Array<number>} flatCoordinates Flat coordinates.
+ * @param {Array<number>=} ends Ends.
+ * @return {GeometryLayout} Layout.
+ */
+
+
+function applyLayoutOptions(layoutOptions, flatCoordinates, ends) {
+  var layout = _GeometryLayout.default.XY;
+  var stride = 2;
+
+  if (layoutOptions.hasZ && layoutOptions.hasM) {
+    layout = _GeometryLayout.default.XYZM;
+    stride = 4;
+  } else if (layoutOptions.hasZ) {
+    layout = _GeometryLayout.default.XYZ;
+    stride = 3;
+  } else if (layoutOptions.hasM) {
+    layout = _GeometryLayout.default.XYM;
+    stride = 3;
+  }
+
+  if (stride !== 4) {
+    for (var i = 0, ii = flatCoordinates.length / 4; i < ii; i++) {
+      flatCoordinates[i * stride] = flatCoordinates[i * 4];
+      flatCoordinates[i * stride + 1] = flatCoordinates[i * 4 + 1];
+
+      if (layoutOptions.hasZ) {
+        flatCoordinates[i * stride + 2] = flatCoordinates[i * 4 + 2];
+      }
+
+      if (layoutOptions.hasM) {
+        flatCoordinates[i * stride + 2] = flatCoordinates[i * 4 + 3];
+      }
+    }
+
+    flatCoordinates.length = flatCoordinates.length / 4 * stride;
+
+    if (ends) {
+      for (var i$1 = 0, ii$1 = ends.length; i$1 < ii$1; i$1++) {
+        ends[i$1] = ends[i$1] / 4 * stride;
+      }
+    }
+  }
+
+  return layout;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function parseLink(node, objectStack) {
+  var values =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  var href = node.getAttribute('href');
+
+  if (href !== null) {
+    values['link'] = href;
+  }
+
+  (0, _xml.parseNode)(LINK_PARSERS, node, objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function parseExtensions(node, objectStack) {
+  var values =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  values['extensionsNode_'] = node;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function parseRtePt(node, objectStack) {
+  var values = (0, _xml.pushParseAndPop)({}, RTEPT_PARSERS, node, objectStack);
+
+  if (values) {
+    var rteValues =
+    /** @type {!Object} */
+    objectStack[objectStack.length - 1];
+    var flatCoordinates =
+    /** @type {Array<number>} */
+    rteValues['flatCoordinates'];
+    var layoutOptions =
+    /** @type {LayoutOptions} */
+    rteValues['layoutOptions'];
+    appendCoordinate(flatCoordinates, layoutOptions, node, values);
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function parseTrkPt(node, objectStack) {
+  var values = (0, _xml.pushParseAndPop)({}, TRKPT_PARSERS, node, objectStack);
+
+  if (values) {
+    var trkValues =
+    /** @type {!Object} */
+    objectStack[objectStack.length - 1];
+    var flatCoordinates =
+    /** @type {Array<number>} */
+    trkValues['flatCoordinates'];
+    var layoutOptions =
+    /** @type {LayoutOptions} */
+    trkValues['layoutOptions'];
+    appendCoordinate(flatCoordinates, layoutOptions, node, values);
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function parseTrkSeg(node, objectStack) {
+  var values =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  (0, _xml.parseNode)(TRKSEG_PARSERS, node, objectStack);
+  var flatCoordinates =
+  /** @type {Array<number>} */
+  values['flatCoordinates'];
+  var ends =
+  /** @type {Array<number>} */
+  values['ends'];
+  ends.push(flatCoordinates.length);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Feature|undefined} Track.
+ */
+
+
+function readRte(node, objectStack) {
+  var options =
+  /** @type {import("./Feature.js").ReadOptions} */
+  objectStack[0];
+  var values = (0, _xml.pushParseAndPop)({
+    'flatCoordinates': [],
+    'layoutOptions': {}
+  }, RTE_PARSERS, node, objectStack);
+
+  if (!values) {
+    return undefined;
+  }
+
+  var flatCoordinates =
+  /** @type {Array<number>} */
+  values['flatCoordinates'];
+  delete values['flatCoordinates'];
+  var layoutOptions =
+  /** @type {LayoutOptions} */
+  values['layoutOptions'];
+  delete values['layoutOptions'];
+  var layout = applyLayoutOptions(layoutOptions, flatCoordinates);
+  var geometry = new _LineString.default(flatCoordinates, layout);
+  (0, _Feature2.transformWithOptions)(geometry, false, options);
+  var feature = new _Feature.default(geometry);
+  feature.setProperties(values);
+  return feature;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Feature|undefined} Track.
+ */
+
+
+function readTrk(node, objectStack) {
+  var options =
+  /** @type {import("./Feature.js").ReadOptions} */
+  objectStack[0];
+  var values = (0, _xml.pushParseAndPop)({
+    'flatCoordinates': [],
+    'ends': [],
+    'layoutOptions': {}
+  }, TRK_PARSERS, node, objectStack);
+
+  if (!values) {
+    return undefined;
+  }
+
+  var flatCoordinates =
+  /** @type {Array<number>} */
+  values['flatCoordinates'];
+  delete values['flatCoordinates'];
+  var ends =
+  /** @type {Array<number>} */
+  values['ends'];
+  delete values['ends'];
+  var layoutOptions =
+  /** @type {LayoutOptions} */
+  values['layoutOptions'];
+  delete values['layoutOptions'];
+  var layout = applyLayoutOptions(layoutOptions, flatCoordinates, ends);
+  var geometry = new _MultiLineString.default(flatCoordinates, layout, ends);
+  (0, _Feature2.transformWithOptions)(geometry, false, options);
+  var feature = new _Feature.default(geometry);
+  feature.setProperties(values);
+  return feature;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Feature|undefined} Waypoint.
+ */
+
+
+function readWpt(node, objectStack) {
+  var options =
+  /** @type {import("./Feature.js").ReadOptions} */
+  objectStack[0];
+  var values = (0, _xml.pushParseAndPop)({}, WPT_PARSERS, node, objectStack);
+
+  if (!values) {
+    return undefined;
+  }
+
+  var layoutOptions =
+  /** @type {LayoutOptions} */
+  {};
+  var coordinates = appendCoordinate([], layoutOptions, node, values);
+  var layout = applyLayoutOptions(layoutOptions, coordinates);
+  var geometry = new _Point.default(coordinates, layout);
+  (0, _Feature2.transformWithOptions)(geometry, false, options);
+  var feature = new _Feature.default(geometry);
+  feature.setProperties(values);
+  return feature;
+}
+/**
+ * @param {Element} node Node.
+ * @param {string} value Value for the link's `href` attribute.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeLink(node, value, objectStack) {
+  node.setAttribute('href', value);
+  var context = objectStack[objectStack.length - 1];
+  var properties = context['properties'];
+  var link = [properties['linkText'], properties['linkType']];
+  (0, _xml.pushSerializeAndPop)(
+  /** @type {import("../xml.js").NodeStackItem} */
+  {
+    node: node
+  }, LINK_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, link, objectStack, LINK_SEQUENCE);
+}
+/**
+ * @param {Element} node Node.
+ * @param {import("../coordinate.js").Coordinate} coordinate Coordinate.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function writeWptType(node, coordinate, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  var parentNode = context.node;
+  var namespaceURI = parentNode.namespaceURI;
+  var properties = context['properties']; //FIXME Projection handling
+
+  node.setAttributeNS(null, 'lat', String(coordinate[1]));
+  node.setAttributeNS(null, 'lon', String(coordinate[0]));
+  var geometryLayout = context['geometryLayout'];
+
+  switch (geometryLayout) {
+    case _GeometryLayout.default.XYZM:
+      if (coordinate[3] !== 0) {
+        properties['time'] = coordinate[3];
+      }
+
+    // fall through
+
+    case _GeometryLayout.default.XYZ:
+      if (coordinate[2] !== 0) {
+        properties['ele'] = coordinate[2];
+      }
+
+      break;
+
+    case _GeometryLayout.default.XYM:
+      if (coordinate[2] !== 0) {
+        properties['time'] = coordinate[2];
+      }
+
+      break;
+
+    default: // pass
+
+  }
+
+  var orderedKeys = node.nodeName == 'rtept' ? RTEPT_TYPE_SEQUENCE[namespaceURI] : WPT_TYPE_SEQUENCE[namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(
+  /** @type {import("../xml.js").NodeStackItem} */
+  {
+    node: node,
+    'properties': properties
+  }, WPT_TYPE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @param {Node} node Node.
+ * @param {Feature} feature Feature.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function writeRte(node, feature, objectStack) {
+  var options =
+  /** @type {import("./Feature.js").WriteOptions} */
+  objectStack[0];
+  var properties = feature.getProperties();
+  var context = {
+    node: node
+  };
+  context['properties'] = properties;
+  var geometry = feature.getGeometry();
+
+  if (geometry.getType() == _GeometryType.default.LINE_STRING) {
+    var lineString =
+    /** @type {LineString} */
+    (0, _Feature2.transformWithOptions)(geometry, true, options);
+    context['geometryLayout'] = lineString.getLayout();
+    properties['rtept'] = lineString.getCoordinates();
+  }
+
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = RTE_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, RTE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @param {Node} node Node.
+ * @param {Feature} feature Feature.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function writeTrk(node, feature, objectStack) {
+  var options =
+  /** @type {import("./Feature.js").WriteOptions} */
+  objectStack[0];
+  var properties = feature.getProperties();
+  /** @type {import("../xml.js").NodeStackItem} */
+
+  var context = {
+    node: node
+  };
+  context['properties'] = properties;
+  var geometry = feature.getGeometry();
+
+  if (geometry.getType() == _GeometryType.default.MULTI_LINE_STRING) {
+    var multiLineString =
+    /** @type {MultiLineString} */
+    (0, _Feature2.transformWithOptions)(geometry, true, options);
+    properties['trkseg'] = multiLineString.getLineStrings();
+  }
+
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = TRK_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, TRK_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @param {Node} node Node.
+ * @param {LineString} lineString LineString.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function writeTrkSeg(node, lineString, objectStack) {
+  /** @type {import("../xml.js").NodeStackItem} */
+  var context = {
+    node: node
+  };
+  context['geometryLayout'] = lineString.getLayout();
+  context['properties'] = {};
+  (0, _xml.pushSerializeAndPop)(context, TRKSEG_SERIALIZERS, TRKSEG_NODE_FACTORY, lineString.getCoordinates(), objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Feature} feature Feature.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function writeWpt(node, feature, objectStack) {
+  var options =
+  /** @type {import("./Feature.js").WriteOptions} */
+  objectStack[0];
+  var context = objectStack[objectStack.length - 1];
+  context['properties'] = feature.getProperties();
+  var geometry = feature.getGeometry();
+
+  if (geometry.getType() == _GeometryType.default.POINT) {
+    var point =
+    /** @type {Point} */
+    (0, _Feature2.transformWithOptions)(geometry, true, options);
+    context['geometryLayout'] = point.getLayout();
+    writeWptType(node, point.getCoordinates(), objectStack);
+  }
+}
+
+var _default = GPX;
+exports.default = _default;
+},{"../Feature.js":"../node_modules/ol/Feature.js","../array.js":"../node_modules/ol/array.js","./Feature.js":"../node_modules/ol/format/Feature.js","./XMLFeature.js":"../node_modules/ol/format/XMLFeature.js","./xsd.js":"../node_modules/ol/format/xsd.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/GeometryType.js":"../node_modules/ol/geom/GeometryType.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/Point.js":"../node_modules/ol/geom/Point.js","../proj.js":"../node_modules/ol/proj.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/TextFeature.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _util = require("../util.js");
+
+var _Feature = _interopRequireDefault(require("../format/Feature.js"));
+
+var _FormatType = _interopRequireDefault(require("../format/FormatType.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/TextFeature
+ */
+
+/**
+ * @classdesc
+ * Abstract base class; normally only used for creating subclasses and not
+ * instantiated in apps.
+ * Base class for text feature formats.
+ *
+ * @abstract
+ */
+var TextFeature =
+/*@__PURE__*/
+function (FeatureFormat) {
+  function TextFeature() {
+    FeatureFormat.call(this);
+  }
+
+  if (FeatureFormat) TextFeature.__proto__ = FeatureFormat;
+  TextFeature.prototype = Object.create(FeatureFormat && FeatureFormat.prototype);
+  TextFeature.prototype.constructor = TextFeature;
+  /**
+   * @inheritDoc
+   */
+
+  TextFeature.prototype.getType = function getType() {
+    return _FormatType.default.TEXT;
+  };
+  /**
+   * Read the feature from the source.
+   *
+   * @param {Document|Node|Object|string} source Source.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @return {import("../Feature.js").default} Feature.
+   * @api
+   */
+
+
+  TextFeature.prototype.readFeature = function readFeature(source, opt_options) {
+    return this.readFeatureFromText(getText(source), this.adaptOptions(opt_options));
+  };
+  /**
+   * @abstract
+   * @param {string} text Text.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @protected
+   * @return {import("../Feature.js").default} Feature.
+   */
+
+
+  TextFeature.prototype.readFeatureFromText = function readFeatureFromText(text, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Read the features from the source.
+   *
+   * @param {Document|Node|Object|string} source Source.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @return {Array<import("../Feature.js").default>} Features.
+   * @api
+   */
+
+
+  TextFeature.prototype.readFeatures = function readFeatures(source, opt_options) {
+    return this.readFeaturesFromText(getText(source), this.adaptOptions(opt_options));
+  };
+  /**
+   * @abstract
+   * @param {string} text Text.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @protected
+   * @return {Array<import("../Feature.js").default>} Features.
+   */
+
+
+  TextFeature.prototype.readFeaturesFromText = function readFeaturesFromText(text, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Read the geometry from the source.
+   *
+   * @param {Document|Node|Object|string} source Source.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @return {import("../geom/Geometry.js").default} Geometry.
+   * @api
+   */
+
+
+  TextFeature.prototype.readGeometry = function readGeometry(source, opt_options) {
+    return this.readGeometryFromText(getText(source), this.adaptOptions(opt_options));
+  };
+  /**
+   * @abstract
+   * @param {string} text Text.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @protected
+   * @return {import("../geom/Geometry.js").default} Geometry.
+   */
+
+
+  TextFeature.prototype.readGeometryFromText = function readGeometryFromText(text, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Read the projection from the source.
+   *
+   * @param {Document|Node|Object|string} source Source.
+   * @return {import("../proj/Projection.js").default} Projection.
+   * @api
+   */
+
+
+  TextFeature.prototype.readProjection = function readProjection(source) {
+    return this.readProjectionFromText(getText(source));
+  };
+  /**
+   * @param {string} text Text.
+   * @protected
+   * @return {import("../proj/Projection.js").default} Projection.
+   */
+
+
+  TextFeature.prototype.readProjectionFromText = function readProjectionFromText(text) {
+    return this.dataProjection;
+  };
+  /**
+   * Encode a feature as a string.
+   *
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {string} Encoded feature.
+   * @api
+   */
+
+
+  TextFeature.prototype.writeFeature = function writeFeature(feature, opt_options) {
+    return this.writeFeatureText(feature, this.adaptOptions(opt_options));
+  };
+  /**
+   * @abstract
+   * @param {import("../Feature.js").default} feature Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @protected
+   * @return {string} Text.
+   */
+
+
+  TextFeature.prototype.writeFeatureText = function writeFeatureText(feature, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Encode an array of features as string.
+   *
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {string} Encoded features.
+   * @api
+   */
+
+
+  TextFeature.prototype.writeFeatures = function writeFeatures(features, opt_options) {
+    return this.writeFeaturesText(features, this.adaptOptions(opt_options));
+  };
+  /**
+   * @abstract
+   * @param {Array<import("../Feature.js").default>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @protected
+   * @return {string} Text.
+   */
+
+
+  TextFeature.prototype.writeFeaturesText = function writeFeaturesText(features, opt_options) {
+    return (0, _util.abstract)();
+  };
+  /**
+   * Write a single geometry.
+   *
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @return {string} Geometry.
+   * @api
+   */
+
+
+  TextFeature.prototype.writeGeometry = function writeGeometry(geometry, opt_options) {
+    return this.writeGeometryText(geometry, this.adaptOptions(opt_options));
+  };
+  /**
+   * @abstract
+   * @param {import("../geom/Geometry.js").default} geometry Geometry.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Write options.
+   * @protected
+   * @return {string} Text.
+   */
+
+
+  TextFeature.prototype.writeGeometryText = function writeGeometryText(geometry, opt_options) {
+    return (0, _util.abstract)();
+  };
+
+  return TextFeature;
+}(_Feature.default);
+/**
+ * @param {Document|Node|Object|string} source Source.
+ * @return {string} Text.
+ */
+
+
+function getText(source) {
+  if (typeof source === 'string') {
+    return source;
+  } else {
+    return '';
+  }
+}
+
+var _default = TextFeature;
+exports.default = _default;
+},{"../util.js":"../node_modules/ol/util.js","../format/Feature.js":"../node_modules/ol/format/Feature.js","../format/FormatType.js":"../node_modules/ol/format/FormatType.js"}],"../node_modules/ol/format/IGC.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _Feature2 = require("./Feature.js");
+
+var _TextFeature = _interopRequireDefault(require("./TextFeature.js"));
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _proj = require("../proj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/IGC
+ */
+
+/**
+ * IGC altitude/z. One of 'barometric', 'gps', 'none'.
+ * @enum {string}
+ */
+var IGCZ = {
+  BAROMETRIC: 'barometric',
+  GPS: 'gps',
+  NONE: 'none'
+};
+/**
+ * @const
+ * @type {RegExp}
+ */
+
+var B_RECORD_RE = /^B(\d{2})(\d{2})(\d{2})(\d{2})(\d{5})([NS])(\d{3})(\d{5})([EW])([AV])(\d{5})(\d{5})/;
+/**
+ * @const
+ * @type {RegExp}
+ */
+
+var H_RECORD_RE = /^H.([A-Z]{3}).*?:(.*)/;
+/**
+ * @const
+ * @type {RegExp}
+ */
+
+var HFDTE_RECORD_RE = /^HFDTE(\d{2})(\d{2})(\d{2})/;
+/**
+ * A regular expression matching the newline characters `\r\n`, `\r` and `\n`.
+ *
+ * @const
+ * @type {RegExp}
+ */
+
+var NEWLINE_RE = /\r\n|\r|\n/;
+/**
+ * @typedef {Object} Options
+ * @property {IGCZ|string} [altitudeMode='none'] Altitude mode. Possible
+ * values are `'barometric'`, `'gps'`, and `'none'`.
+ */
+
+/**
+ * @classdesc
+ * Feature format for `*.igc` flight recording files.
+ *
+ * As IGC sources contain a single feature,
+ * {@link module:ol/format/IGC~IGC#readFeatures} will return the feature in an
+ * array
+ *
+ * @api
+ */
+
+var IGC =
+/*@__PURE__*/
+function (TextFeature) {
+  function IGC(opt_options) {
+    TextFeature.call(this);
+    var options = opt_options ? opt_options : {};
+    /**
+     * @inheritDoc
+     */
+
+    this.dataProjection = (0, _proj.get)('EPSG:4326');
+    /**
+     * @private
+     * @type {IGCZ}
+     */
+
+    this.altitudeMode_ = options.altitudeMode ? options.altitudeMode : IGCZ.NONE;
+  }
+
+  if (TextFeature) IGC.__proto__ = TextFeature;
+  IGC.prototype = Object.create(TextFeature && TextFeature.prototype);
+  IGC.prototype.constructor = IGC;
+  /**
+   * @inheritDoc
+   */
+
+  IGC.prototype.readFeatureFromText = function readFeatureFromText(text, opt_options) {
+    var altitudeMode = this.altitudeMode_;
+    var lines = text.split(NEWLINE_RE);
+    /** @type {Object<string, string>} */
+
+    var properties = {};
+    var flatCoordinates = [];
+    var year = 2000;
+    var month = 0;
+    var day = 1;
+    var lastDateTime = -1;
+    var i, ii;
+
+    for (i = 0, ii = lines.length; i < ii; ++i) {
+      var line = lines[i];
+      var m = void 0;
+
+      if (line.charAt(0) == 'B') {
+        m = B_RECORD_RE.exec(line);
+
+        if (m) {
+          var hour = parseInt(m[1], 10);
+          var minute = parseInt(m[2], 10);
+          var second = parseInt(m[3], 10);
+          var y = parseInt(m[4], 10) + parseInt(m[5], 10) / 60000;
+
+          if (m[6] == 'S') {
+            y = -y;
+          }
+
+          var x = parseInt(m[7], 10) + parseInt(m[8], 10) / 60000;
+
+          if (m[9] == 'W') {
+            x = -x;
+          }
+
+          flatCoordinates.push(x, y);
+
+          if (altitudeMode != IGCZ.NONE) {
+            var z = void 0;
+
+            if (altitudeMode == IGCZ.GPS) {
+              z = parseInt(m[11], 10);
+            } else if (altitudeMode == IGCZ.BAROMETRIC) {
+              z = parseInt(m[12], 10);
+            } else {
+              z = 0;
+            }
+
+            flatCoordinates.push(z);
+          }
+
+          var dateTime = Date.UTC(year, month, day, hour, minute, second); // Detect UTC midnight wrap around.
+
+          if (dateTime < lastDateTime) {
+            dateTime = Date.UTC(year, month, day + 1, hour, minute, second);
+          }
+
+          flatCoordinates.push(dateTime / 1000);
+          lastDateTime = dateTime;
+        }
+      } else if (line.charAt(0) == 'H') {
+        m = HFDTE_RECORD_RE.exec(line);
+
+        if (m) {
+          day = parseInt(m[1], 10);
+          month = parseInt(m[2], 10) - 1;
+          year = 2000 + parseInt(m[3], 10);
+        } else {
+          m = H_RECORD_RE.exec(line);
+
+          if (m) {
+            properties[m[1]] = m[2].trim();
+          }
+        }
+      }
+    }
+
+    if (flatCoordinates.length === 0) {
+      return null;
+    }
+
+    var layout = altitudeMode == IGCZ.NONE ? _GeometryLayout.default.XYM : _GeometryLayout.default.XYZM;
+    var lineString = new _LineString.default(flatCoordinates, layout);
+    var feature = new _Feature.default((0, _Feature2.transformWithOptions)(lineString, false, opt_options));
+    feature.setProperties(properties);
+    return feature;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  IGC.prototype.readFeaturesFromText = function readFeaturesFromText(text, opt_options) {
+    var feature = this.readFeatureFromText(text, opt_options);
+
+    if (feature) {
+      return [feature];
+    } else {
+      return [];
+    }
+  };
+
+  return IGC;
+}(_TextFeature.default);
+
+var _default = IGC;
+exports.default = _default;
+},{"../Feature.js":"../node_modules/ol/Feature.js","./Feature.js":"../node_modules/ol/format/Feature.js","./TextFeature.js":"../node_modules/ol/format/TextFeature.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../proj.js":"../node_modules/ol/proj.js"}],"../node_modules/ol/style/IconAnchorUnits.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+/**
+ * @module ol/style/IconAnchorUnits
+ */
+
+/**
+ * Icon anchor units. One of 'fraction', 'pixels'.
+ * @enum {string}
+ */
+var _default = {
+  FRACTION: 'fraction',
+  PIXELS: 'pixels'
+};
+exports.default = _default;
+},{}],"../node_modules/ol/style/IconImage.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.get = get;
+exports.default = void 0;
+
+var _dom = require("../dom.js");
+
+var _events = require("../events.js");
+
+var _Target = _interopRequireDefault(require("../events/Target.js"));
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _ImageState = _interopRequireDefault(require("../ImageState.js"));
+
+var _IconImageCache = require("./IconImageCache.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/style/IconImage
+ */
+var IconImage =
+/*@__PURE__*/
+function (EventTarget) {
+  function IconImage(image, src, size, crossOrigin, imageState, color) {
+    EventTarget.call(this);
+    /**
+     * @private
+     * @type {HTMLImageElement|HTMLCanvasElement}
+     */
+
+    this.hitDetectionImage_ = null;
+    /**
+     * @private
+     * @type {HTMLImageElement|HTMLCanvasElement}
+     */
+
+    this.image_ = !image ? new Image() : image;
+
+    if (crossOrigin !== null) {
+      /** @type {HTMLImageElement} */
+      this.image_.crossOrigin = crossOrigin;
+    }
+    /**
+     * @private
+     * @type {HTMLCanvasElement}
+     */
+
+
+    this.canvas_ = color ?
+    /** @type {HTMLCanvasElement} */
+    document.createElement('canvas') : null;
+    /**
+     * @private
+     * @type {import("../color.js").Color}
+     */
+
+    this.color_ = color;
+    /**
+     * @private
+     * @type {Array<import("../events.js").EventsKey>}
+     */
+
+    this.imageListenerKeys_ = null;
+    /**
+     * @private
+     * @type {import("../ImageState.js").default}
+     */
+
+    this.imageState_ = imageState;
+    /**
+     * @private
+     * @type {import("../size.js").Size}
+     */
+
+    this.size_ = size;
+    /**
+     * @private
+     * @type {string|undefined}
+     */
+
+    this.src_ = src;
+    /**
+     * @private
+     * @type {boolean|undefined}
+     */
+
+    this.tainted_;
+  }
+
+  if (EventTarget) IconImage.__proto__ = EventTarget;
+  IconImage.prototype = Object.create(EventTarget && EventTarget.prototype);
+  IconImage.prototype.constructor = IconImage;
+  /**
+   * @private
+   * @return {boolean} The image canvas is tainted.
+   */
+
+  IconImage.prototype.isTainted_ = function isTainted_() {
+    if (this.tainted_ === undefined && this.imageState_ === _ImageState.default.LOADED) {
+      this.tainted_ = false;
+      var context = (0, _dom.createCanvasContext2D)(1, 1);
+
+      try {
+        context.drawImage(this.image_, 0, 0);
+        context.getImageData(0, 0, 1, 1);
+      } catch (e) {
+        this.tainted_ = true;
+      }
+    }
+
+    return this.tainted_ === true;
+  };
+  /**
+   * @private
+   */
+
+
+  IconImage.prototype.dispatchChangeEvent_ = function dispatchChangeEvent_() {
+    this.dispatchEvent(_EventType.default.CHANGE);
+  };
+  /**
+   * @private
+   */
+
+
+  IconImage.prototype.handleImageError_ = function handleImageError_() {
+    this.imageState_ = _ImageState.default.ERROR;
+    this.unlistenImage_();
+    this.dispatchChangeEvent_();
+  };
+  /**
+   * @private
+   */
+
+
+  IconImage.prototype.handleImageLoad_ = function handleImageLoad_() {
+    this.imageState_ = _ImageState.default.LOADED;
+
+    if (this.size_) {
+      this.image_.width = this.size_[0];
+      this.image_.height = this.size_[1];
+    }
+
+    this.size_ = [this.image_.width, this.image_.height];
+    this.unlistenImage_();
+    this.replaceColor_();
+    this.dispatchChangeEvent_();
+  };
+  /**
+   * @param {number} pixelRatio Pixel ratio.
+   * @return {HTMLImageElement|HTMLCanvasElement} Image or Canvas element.
+   */
+
+
+  IconImage.prototype.getImage = function getImage(pixelRatio) {
+    return this.canvas_ ? this.canvas_ : this.image_;
+  };
+  /**
+   * @return {import("../ImageState.js").default} Image state.
+   */
+
+
+  IconImage.prototype.getImageState = function getImageState() {
+    return this.imageState_;
+  };
+  /**
+   * @param {number} pixelRatio Pixel ratio.
+   * @return {HTMLImageElement|HTMLCanvasElement} Image element.
+   */
+
+
+  IconImage.prototype.getHitDetectionImage = function getHitDetectionImage(pixelRatio) {
+    if (!this.hitDetectionImage_) {
+      if (this.isTainted_()) {
+        var width = this.size_[0];
+        var height = this.size_[1];
+        var context = (0, _dom.createCanvasContext2D)(width, height);
+        context.fillRect(0, 0, width, height);
+        this.hitDetectionImage_ = context.canvas;
+      } else {
+        this.hitDetectionImage_ = this.image_;
+      }
+    }
+
+    return this.hitDetectionImage_;
+  };
+  /**
+   * @return {import("../size.js").Size} Image size.
+   */
+
+
+  IconImage.prototype.getSize = function getSize() {
+    return this.size_;
+  };
+  /**
+   * @return {string|undefined} Image src.
+   */
+
+
+  IconImage.prototype.getSrc = function getSrc() {
+    return this.src_;
+  };
+  /**
+   * Load not yet loaded URI.
+   */
+
+
+  IconImage.prototype.load = function load() {
+    if (this.imageState_ == _ImageState.default.IDLE) {
+      this.imageState_ = _ImageState.default.LOADING;
+      this.imageListenerKeys_ = [(0, _events.listenOnce)(this.image_, _EventType.default.ERROR, this.handleImageError_, this), (0, _events.listenOnce)(this.image_, _EventType.default.LOAD, this.handleImageLoad_, this)];
+
+      try {
+        /** @type {HTMLImageElement} */
+        this.image_.src = this.src_;
+      } catch (e) {
+        this.handleImageError_();
+      }
+    }
+  };
+  /**
+   * @private
+   */
+
+
+  IconImage.prototype.replaceColor_ = function replaceColor_() {
+    if (!this.color_ || this.isTainted_()) {
+      return;
+    }
+
+    this.canvas_.width = this.image_.width;
+    this.canvas_.height = this.image_.height;
+    var ctx = this.canvas_.getContext('2d');
+    ctx.drawImage(this.image_, 0, 0);
+    var imgData = ctx.getImageData(0, 0, this.image_.width, this.image_.height);
+    var data = imgData.data;
+    var r = this.color_[0] / 255.0;
+    var g = this.color_[1] / 255.0;
+    var b = this.color_[2] / 255.0;
+
+    for (var i = 0, ii = data.length; i < ii; i += 4) {
+      data[i] *= r;
+      data[i + 1] *= g;
+      data[i + 2] *= b;
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+  };
+  /**
+   * Discards event handlers which listen for load completion or errors.
+   *
+   * @private
+   */
+
+
+  IconImage.prototype.unlistenImage_ = function unlistenImage_() {
+    this.imageListenerKeys_.forEach(_events.unlistenByKey);
+    this.imageListenerKeys_ = null;
+  };
+
+  return IconImage;
+}(_Target.default);
+/**
+ * @param {HTMLImageElement|HTMLCanvasElement} image Image.
+ * @param {string} src Src.
+ * @param {import("../size.js").Size} size Size.
+ * @param {?string} crossOrigin Cross origin.
+ * @param {import("../ImageState.js").default} imageState Image state.
+ * @param {import("../color.js").Color} color Color.
+ * @return {IconImage} Icon image.
+ */
+
+
+function get(image, src, size, crossOrigin, imageState, color) {
+  var iconImage = _IconImageCache.shared.get(src, crossOrigin, color);
+
+  if (!iconImage) {
+    iconImage = new IconImage(image, src, size, crossOrigin, imageState, color);
+
+    _IconImageCache.shared.set(src, crossOrigin, color, iconImage);
+  }
+
+  return iconImage;
+}
+
+var _default = IconImage;
+exports.default = _default;
+},{"../dom.js":"../node_modules/ol/dom.js","../events.js":"../node_modules/ol/events.js","../events/Target.js":"../node_modules/ol/events/Target.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","../ImageState.js":"../node_modules/ol/ImageState.js","./IconImageCache.js":"../node_modules/ol/style/IconImageCache.js"}],"../node_modules/ol/style/IconOrigin.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+/**
+ * @module ol/style/IconOrigin
+ */
+
+/**
+ * Icon origin. One of 'bottom-left', 'bottom-right', 'top-left', 'top-right'.
+ * @enum {string}
+ */
+var _default = {
+  BOTTOM_LEFT: 'bottom-left',
+  BOTTOM_RIGHT: 'bottom-right',
+  TOP_LEFT: 'top-left',
+  TOP_RIGHT: 'top-right'
+};
+exports.default = _default;
+},{}],"../node_modules/ol/style/Icon.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _util = require("../util.js");
+
+var _ImageState = _interopRequireDefault(require("../ImageState.js"));
+
+var _asserts = require("../asserts.js");
+
+var _color = require("../color.js");
+
+var _events = require("../events.js");
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _IconAnchorUnits = _interopRequireDefault(require("./IconAnchorUnits.js"));
+
+var _IconImage = require("./IconImage.js");
+
+var _IconOrigin = _interopRequireDefault(require("./IconOrigin.js"));
+
+var _Image = _interopRequireDefault(require("./Image.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/style/Icon
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {Array<number>} [anchor=[0.5, 0.5]] Anchor. Default value is the icon center.
+ * @property {import("./IconOrigin.js").default} [anchorOrigin] Origin of the anchor: `bottom-left`, `bottom-right`,
+ * `top-left` or `top-right`. Default is `top-left`.
+ * @property {import("./IconAnchorUnits.js").default} [anchorXUnits] Units in which the anchor x value is
+ * specified. A value of `'fraction'` indicates the x value is a fraction of the icon. A value of `'pixels'` indicates
+ * the x value in pixels. Default is `'fraction'`.
+ * @property {import("./IconAnchorUnits.js").default} [anchorYUnits] Units in which the anchor y value is
+ * specified. A value of `'fraction'` indicates the y value is a fraction of the icon. A value of `'pixels'` indicates
+ * the y value in pixels. Default is `'fraction'`.
+ * @property {import("../color.js").Color|string} [color] Color to tint the icon. If not specified,
+ * the icon will be left as is.
+ * @property {null|string} [crossOrigin] The `crossOrigin` attribute for loaded images. Note that you must provide a
+ * `crossOrigin` value if you are using the WebGL renderer or if you want to access pixel data with the Canvas renderer.
+ * See https://developer.mozilla.org/en-US/docs/Web/HTML/CORS_enabled_image for more detail.
+ * @property {HTMLImageElement|HTMLCanvasElement} [img] Image object for the icon. If the `src` option is not provided then the
+ * provided image must already be loaded. And in that case, it is required
+ * to provide the size of the image, with the `imgSize` option.
+ * @property {Array<number>} [offset=[0, 0]] Offset, which, together with the size and the offset origin, define the
+ * sub-rectangle to use from the original icon image.
+ * @property {import("./IconOrigin.js").default} [offsetOrigin] Origin of the offset: `bottom-left`, `bottom-right`,
+ * `top-left` or `top-right`. Default is `top-left`.
+ * @property {number} [opacity=1] Opacity of the icon.
+ * @property {number} [scale=1] Scale.
+ * @property {boolean} [rotateWithView=false] Whether to rotate the icon with the view.
+ * @property {number} [rotation=0] Rotation in radians (positive rotation clockwise).
+ * @property {import("../size.js").Size} [size] Icon size in pixel. Can be used together with `offset` to define the
+ * sub-rectangle to use from the origin (sprite) icon image.
+ * @property {import("../size.js").Size} [imgSize] Image size in pixels. Only required if `img` is set and `src` is not, and
+ * for SVG images in Internet Explorer 11. The provided `imgSize` needs to match the actual size of the image.
+ * @property {string} [src] Image source URI.
+ */
+
+/**
+ * @classdesc
+ * Set icon style for vector features.
+ * @api
+ */
+var Icon =
+/*@__PURE__*/
+function (ImageStyle) {
+  function Icon(opt_options) {
+    var options = opt_options || {};
+    /**
+     * @type {number}
+     */
+
+    var opacity = options.opacity !== undefined ? options.opacity : 1;
+    /**
+     * @type {number}
+     */
+
+    var rotation = options.rotation !== undefined ? options.rotation : 0;
+    /**
+     * @type {number}
+     */
+
+    var scale = options.scale !== undefined ? options.scale : 1;
+    /**
+     * @type {boolean}
+     */
+
+    var rotateWithView = options.rotateWithView !== undefined ? options.rotateWithView : false;
+    ImageStyle.call(this, {
+      opacity: opacity,
+      rotation: rotation,
+      scale: scale,
+      rotateWithView: rotateWithView
+    });
+    /**
+     * @private
+     * @type {Array<number>}
+     */
+
+    this.anchor_ = options.anchor !== undefined ? options.anchor : [0.5, 0.5];
+    /**
+     * @private
+     * @type {Array<number>}
+     */
+
+    this.normalizedAnchor_ = null;
+    /**
+     * @private
+     * @type {import("./IconOrigin.js").default}
+     */
+
+    this.anchorOrigin_ = options.anchorOrigin !== undefined ? options.anchorOrigin : _IconOrigin.default.TOP_LEFT;
+    /**
+     * @private
+     * @type {import("./IconAnchorUnits.js").default}
+     */
+
+    this.anchorXUnits_ = options.anchorXUnits !== undefined ? options.anchorXUnits : _IconAnchorUnits.default.FRACTION;
+    /**
+     * @private
+     * @type {import("./IconAnchorUnits.js").default}
+     */
+
+    this.anchorYUnits_ = options.anchorYUnits !== undefined ? options.anchorYUnits : _IconAnchorUnits.default.FRACTION;
+    /**
+     * @private
+     * @type {?string}
+     */
+
+    this.crossOrigin_ = options.crossOrigin !== undefined ? options.crossOrigin : null;
+    /**
+     * @type {HTMLImageElement|HTMLCanvasElement}
+     */
+
+    var image = options.img !== undefined ? options.img : null;
+    /**
+     * @type {import("../size.js").Size}
+     */
+
+    var imgSize = options.imgSize !== undefined ? options.imgSize : null;
+    /**
+     * @type {string|undefined}
+     */
+
+    var src = options.src;
+    (0, _asserts.assert)(!(src !== undefined && image), 4); // `image` and `src` cannot be provided at the same time
+
+    (0, _asserts.assert)(!image || image && imgSize, 5); // `imgSize` must be set when `image` is provided
+
+    if ((src === undefined || src.length === 0) && image) {
+      src =
+      /** @type {HTMLImageElement} */
+      image.src || (0, _util.getUid)(image);
+    }
+
+    (0, _asserts.assert)(src !== undefined && src.length > 0, 6); // A defined and non-empty `src` or `image` must be provided
+
+    /**
+     * @type {import("../ImageState.js").default}
+     */
+
+    var imageState = options.src !== undefined ? _ImageState.default.IDLE : _ImageState.default.LOADED;
+    /**
+     * @private
+     * @type {import("../color.js").Color}
+     */
+
+    this.color_ = options.color !== undefined ? (0, _color.asArray)(options.color) : null;
+    /**
+     * @private
+     * @type {import("./IconImage.js").default}
+     */
+
+    this.iconImage_ = (0, _IconImage.get)(image,
+    /** @type {string} */
+    src, imgSize, this.crossOrigin_, imageState, this.color_);
+    /**
+     * @private
+     * @type {Array<number>}
+     */
+
+    this.offset_ = options.offset !== undefined ? options.offset : [0, 0];
+    /**
+     * @private
+     * @type {import("./IconOrigin.js").default}
+     */
+
+    this.offsetOrigin_ = options.offsetOrigin !== undefined ? options.offsetOrigin : _IconOrigin.default.TOP_LEFT;
+    /**
+     * @private
+     * @type {Array<number>}
+     */
+
+    this.origin_ = null;
+    /**
+     * @private
+     * @type {import("../size.js").Size}
+     */
+
+    this.size_ = options.size !== undefined ? options.size : null;
+  }
+
+  if (ImageStyle) Icon.__proto__ = ImageStyle;
+  Icon.prototype = Object.create(ImageStyle && ImageStyle.prototype);
+  Icon.prototype.constructor = Icon;
+  /**
+   * Clones the style. The underlying Image/HTMLCanvasElement is not cloned.
+   * @return {Icon} The cloned style.
+   * @api
+   */
+
+  Icon.prototype.clone = function clone() {
+    return new Icon({
+      anchor: this.anchor_.slice(),
+      anchorOrigin: this.anchorOrigin_,
+      anchorXUnits: this.anchorXUnits_,
+      anchorYUnits: this.anchorYUnits_,
+      crossOrigin: this.crossOrigin_,
+      color: this.color_ && this.color_.slice ? this.color_.slice() : this.color_ || undefined,
+      src: this.getSrc(),
+      offset: this.offset_.slice(),
+      offsetOrigin: this.offsetOrigin_,
+      size: this.size_ !== null ? this.size_.slice() : undefined,
+      opacity: this.getOpacity(),
+      scale: this.getScale(),
+      rotation: this.getRotation(),
+      rotateWithView: this.getRotateWithView()
+    });
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  Icon.prototype.getAnchor = function getAnchor() {
+    if (this.normalizedAnchor_) {
+      return this.normalizedAnchor_;
+    }
+
+    var anchor = this.anchor_;
+    var size = this.getSize();
+
+    if (this.anchorXUnits_ == _IconAnchorUnits.default.FRACTION || this.anchorYUnits_ == _IconAnchorUnits.default.FRACTION) {
+      if (!size) {
+        return null;
+      }
+
+      anchor = this.anchor_.slice();
+
+      if (this.anchorXUnits_ == _IconAnchorUnits.default.FRACTION) {
+        anchor[0] *= size[0];
+      }
+
+      if (this.anchorYUnits_ == _IconAnchorUnits.default.FRACTION) {
+        anchor[1] *= size[1];
+      }
+    }
+
+    if (this.anchorOrigin_ != _IconOrigin.default.TOP_LEFT) {
+      if (!size) {
+        return null;
+      }
+
+      if (anchor === this.anchor_) {
+        anchor = this.anchor_.slice();
+      }
+
+      if (this.anchorOrigin_ == _IconOrigin.default.TOP_RIGHT || this.anchorOrigin_ == _IconOrigin.default.BOTTOM_RIGHT) {
+        anchor[0] = -anchor[0] + size[0];
+      }
+
+      if (this.anchorOrigin_ == _IconOrigin.default.BOTTOM_LEFT || this.anchorOrigin_ == _IconOrigin.default.BOTTOM_RIGHT) {
+        anchor[1] = -anchor[1] + size[1];
+      }
+    }
+
+    this.normalizedAnchor_ = anchor;
+    return this.normalizedAnchor_;
+  };
+  /**
+   * Set the anchor point. The anchor determines the center point for the
+   * symbolizer.
+   *
+   * @param {Array<number>} anchor Anchor.
+   * @api
+   */
+
+
+  Icon.prototype.setAnchor = function setAnchor(anchor) {
+    this.anchor_ = anchor;
+    this.normalizedAnchor_ = null;
+  };
+  /**
+   * Get the icon color.
+   * @return {import("../color.js").Color} Color.
+   * @api
+   */
+
+
+  Icon.prototype.getColor = function getColor() {
+    return this.color_;
+  };
+  /**
+   * Get the image icon.
+   * @param {number} pixelRatio Pixel ratio.
+   * @return {HTMLImageElement|HTMLCanvasElement} Image or Canvas element.
+   * @override
+   * @api
+   */
+
+
+  Icon.prototype.getImage = function getImage(pixelRatio) {
+    return this.iconImage_.getImage(pixelRatio);
+  };
+  /**
+   * @override
+   */
+
+
+  Icon.prototype.getImageSize = function getImageSize() {
+    return this.iconImage_.getSize();
+  };
+  /**
+   * @override
+   */
+
+
+  Icon.prototype.getHitDetectionImageSize = function getHitDetectionImageSize() {
+    return this.getImageSize();
+  };
+  /**
+   * @override
+   */
+
+
+  Icon.prototype.getImageState = function getImageState() {
+    return this.iconImage_.getImageState();
+  };
+  /**
+   * @override
+   */
+
+
+  Icon.prototype.getHitDetectionImage = function getHitDetectionImage(pixelRatio) {
+    return this.iconImage_.getHitDetectionImage(pixelRatio);
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  Icon.prototype.getOrigin = function getOrigin() {
+    if (this.origin_) {
+      return this.origin_;
+    }
+
+    var offset = this.offset_;
+
+    if (this.offsetOrigin_ != _IconOrigin.default.TOP_LEFT) {
+      var size = this.getSize();
+      var iconImageSize = this.iconImage_.getSize();
+
+      if (!size || !iconImageSize) {
+        return null;
+      }
+
+      offset = offset.slice();
+
+      if (this.offsetOrigin_ == _IconOrigin.default.TOP_RIGHT || this.offsetOrigin_ == _IconOrigin.default.BOTTOM_RIGHT) {
+        offset[0] = iconImageSize[0] - size[0] - offset[0];
+      }
+
+      if (this.offsetOrigin_ == _IconOrigin.default.BOTTOM_LEFT || this.offsetOrigin_ == _IconOrigin.default.BOTTOM_RIGHT) {
+        offset[1] = iconImageSize[1] - size[1] - offset[1];
+      }
+    }
+
+    this.origin_ = offset;
+    return this.origin_;
+  };
+  /**
+   * Get the image URL.
+   * @return {string|undefined} Image src.
+   * @api
+   */
+
+
+  Icon.prototype.getSrc = function getSrc() {
+    return this.iconImage_.getSrc();
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  Icon.prototype.getSize = function getSize() {
+    return !this.size_ ? this.iconImage_.getSize() : this.size_;
+  };
+  /**
+   * @override
+   */
+
+
+  Icon.prototype.listenImageChange = function listenImageChange(listener, thisArg) {
+    return (0, _events.listen)(this.iconImage_, _EventType.default.CHANGE, listener, thisArg);
+  };
+  /**
+   * Load not yet loaded URI.
+   * When rendering a feature with an icon style, the vector renderer will
+   * automatically call this method. However, you might want to call this
+   * method yourself for preloading or other purposes.
+   * @override
+   * @api
+   */
+
+
+  Icon.prototype.load = function load() {
+    this.iconImage_.load();
+  };
+  /**
+   * @override
+   */
+
+
+  Icon.prototype.unlistenImageChange = function unlistenImageChange(listener, thisArg) {
+    (0, _events.unlisten)(this.iconImage_, _EventType.default.CHANGE, listener, thisArg);
+  };
+
+  return Icon;
+}(_Image.default);
+
+var _default = Icon;
+exports.default = _default;
+},{"../util.js":"../node_modules/ol/util.js","../ImageState.js":"../node_modules/ol/ImageState.js","../asserts.js":"../node_modules/ol/asserts.js","../color.js":"../node_modules/ol/color.js","../events.js":"../node_modules/ol/events.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","./IconAnchorUnits.js":"../node_modules/ol/style/IconAnchorUnits.js","./IconImage.js":"../node_modules/ol/style/IconImage.js","./IconOrigin.js":"../node_modules/ol/style/IconOrigin.js","./Image.js":"../node_modules/ol/style/Image.js"}],"../node_modules/ol/style/Text.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Fill = _interopRequireDefault(require("./Fill.js"));
+
+var _TextPlacement = _interopRequireDefault(require("./TextPlacement.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/style/Text
+ */
+
+/**
+ * The default fill color to use if no fill was set at construction time; a
+ * blackish `#333`.
+ *
+ * @const {string}
+ */
+var DEFAULT_FILL_COLOR = '#333';
+/**
+ * @typedef {Object} Options
+ * @property {string} [font] Font style as CSS 'font' value, see:
+ * https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/font. Default is '10px sans-serif'
+ * @property {number} [maxAngle] When `placement` is set to `'line'`, allow a maximum angle between adjacent characters.
+ * The expected value is in radians, and the default is 45° (`Math.PI / 4`).
+ * @property {number} [offsetX=0] Horizontal text offset in pixels. A positive will shift the text right.
+ * @property {number} [offsetY=0] Vertical text offset in pixels. A positive will shift the text down.
+ * @property {boolean} [overflow=false] For polygon labels or when `placement` is set to `'line'`, allow text to exceed
+ * the width of the polygon at the label position or the length of the path that it follows.
+ * @property {import("./TextPlacement.js").default|string} [placement] Text placement.
+ * @property {number} [scale] Scale.
+ * @property {boolean} [rotateWithView=false] Whether to rotate the text with the view.
+ * @property {number} [rotation=0] Rotation in radians (positive rotation clockwise).
+ * @property {string} [text] Text content.
+ * @property {string} [textAlign] Text alignment. Possible values: 'left', 'right', 'center', 'end' or 'start'.
+ * Default is 'center' for `placement: 'point'`. For `placement: 'line'`, the default is to let the renderer choose a
+ * placement where `maxAngle` is not exceeded.
+ * @property {string} [textBaseline='middle'] Text base line. Possible values: 'bottom', 'top', 'middle', 'alphabetic',
+ * 'hanging', 'ideographic'.
+ * @property {import("./Fill.js").default} [fill] Fill style. If none is provided, we'll use a dark fill-style (#333).
+ * @property {import("./Stroke.js").default} [stroke] Stroke style.
+ * @property {import("./Fill.js").default} [backgroundFill] Fill style for the text background when `placement` is
+ * `'point'`. Default is no fill.
+ * @property {import("./Stroke.js").default} [backgroundStroke] Stroke style for the text background  when `placement`
+ * is `'point'`. Default is no stroke.
+ * @property {Array<number>} [padding=[0, 0, 0, 0]] Padding in pixels around the text for decluttering and background. The order of
+ * values in the array is `[top, right, bottom, left]`.
+ */
+
+/**
+ * @classdesc
+ * Set text style for vector features.
+ * @api
+ */
+
+var Text = function Text(opt_options) {
+  var options = opt_options || {};
+  /**
+  * @private
+  * @type {string|undefined}
+  */
+
+  this.font_ = options.font;
+  /**
+  * @private
+  * @type {number|undefined}
+  */
+
+  this.rotation_ = options.rotation;
+  /**
+  * @private
+  * @type {boolean|undefined}
+  */
+
+  this.rotateWithView_ = options.rotateWithView;
+  /**
+  * @private
+  * @type {number|undefined}
+  */
+
+  this.scale_ = options.scale;
+  /**
+  * @private
+  * @type {string|undefined}
+  */
+
+  this.text_ = options.text;
+  /**
+  * @private
+  * @type {string|undefined}
+  */
+
+  this.textAlign_ = options.textAlign;
+  /**
+  * @private
+  * @type {string|undefined}
+  */
+
+  this.textBaseline_ = options.textBaseline;
+  /**
+  * @private
+  * @type {import("./Fill.js").default}
+  */
+
+  this.fill_ = options.fill !== undefined ? options.fill : new _Fill.default({
+    color: DEFAULT_FILL_COLOR
+  });
+  /**
+  * @private
+  * @type {number}
+  */
+
+  this.maxAngle_ = options.maxAngle !== undefined ? options.maxAngle : Math.PI / 4;
+  /**
+  * @private
+  * @type {import("./TextPlacement.js").default|string}
+  */
+
+  this.placement_ = options.placement !== undefined ? options.placement : _TextPlacement.default.POINT;
+  /**
+  * @private
+  * @type {boolean}
+  */
+
+  this.overflow_ = !!options.overflow;
+  /**
+  * @private
+  * @type {import("./Stroke.js").default}
+  */
+
+  this.stroke_ = options.stroke !== undefined ? options.stroke : null;
+  /**
+  * @private
+  * @type {number}
+  */
+
+  this.offsetX_ = options.offsetX !== undefined ? options.offsetX : 0;
+  /**
+  * @private
+  * @type {number}
+  */
+
+  this.offsetY_ = options.offsetY !== undefined ? options.offsetY : 0;
+  /**
+  * @private
+  * @type {import("./Fill.js").default}
+  */
+
+  this.backgroundFill_ = options.backgroundFill ? options.backgroundFill : null;
+  /**
+  * @private
+  * @type {import("./Stroke.js").default}
+  */
+
+  this.backgroundStroke_ = options.backgroundStroke ? options.backgroundStroke : null;
+  /**
+  * @private
+  * @type {Array<number>}
+  */
+
+  this.padding_ = options.padding === undefined ? null : options.padding;
+};
+/**
+* Clones the style.
+* @return {Text} The cloned style.
+* @api
+*/
+
+
+Text.prototype.clone = function clone() {
+  return new Text({
+    font: this.getFont(),
+    placement: this.getPlacement(),
+    maxAngle: this.getMaxAngle(),
+    overflow: this.getOverflow(),
+    rotation: this.getRotation(),
+    rotateWithView: this.getRotateWithView(),
+    scale: this.getScale(),
+    text: this.getText(),
+    textAlign: this.getTextAlign(),
+    textBaseline: this.getTextBaseline(),
+    fill: this.getFill() ? this.getFill().clone() : undefined,
+    stroke: this.getStroke() ? this.getStroke().clone() : undefined,
+    offsetX: this.getOffsetX(),
+    offsetY: this.getOffsetY(),
+    backgroundFill: this.getBackgroundFill() ? this.getBackgroundFill().clone() : undefined,
+    backgroundStroke: this.getBackgroundStroke() ? this.getBackgroundStroke().clone() : undefined
+  });
+};
+/**
+* Get the `overflow` configuration.
+* @return {boolean} Let text overflow the length of the path they follow.
+* @api
+*/
+
+
+Text.prototype.getOverflow = function getOverflow() {
+  return this.overflow_;
+};
+/**
+* Get the font name.
+* @return {string|undefined} Font.
+* @api
+*/
+
+
+Text.prototype.getFont = function getFont() {
+  return this.font_;
+};
+/**
+* Get the maximum angle between adjacent characters.
+* @return {number} Angle in radians.
+* @api
+*/
+
+
+Text.prototype.getMaxAngle = function getMaxAngle() {
+  return this.maxAngle_;
+};
+/**
+* Get the label placement.
+* @return {import("./TextPlacement.js").default|string} Text placement.
+* @api
+*/
+
+
+Text.prototype.getPlacement = function getPlacement() {
+  return this.placement_;
+};
+/**
+* Get the x-offset for the text.
+* @return {number} Horizontal text offset.
+* @api
+*/
+
+
+Text.prototype.getOffsetX = function getOffsetX() {
+  return this.offsetX_;
+};
+/**
+* Get the y-offset for the text.
+* @return {number} Vertical text offset.
+* @api
+*/
+
+
+Text.prototype.getOffsetY = function getOffsetY() {
+  return this.offsetY_;
+};
+/**
+* Get the fill style for the text.
+* @return {import("./Fill.js").default} Fill style.
+* @api
+*/
+
+
+Text.prototype.getFill = function getFill() {
+  return this.fill_;
+};
+/**
+* Determine whether the text rotates with the map.
+* @return {boolean|undefined} Rotate with map.
+* @api
+*/
+
+
+Text.prototype.getRotateWithView = function getRotateWithView() {
+  return this.rotateWithView_;
+};
+/**
+* Get the text rotation.
+* @return {number|undefined} Rotation.
+* @api
+*/
+
+
+Text.prototype.getRotation = function getRotation() {
+  return this.rotation_;
+};
+/**
+* Get the text scale.
+* @return {number|undefined} Scale.
+* @api
+*/
+
+
+Text.prototype.getScale = function getScale() {
+  return this.scale_;
+};
+/**
+* Get the stroke style for the text.
+* @return {import("./Stroke.js").default} Stroke style.
+* @api
+*/
+
+
+Text.prototype.getStroke = function getStroke() {
+  return this.stroke_;
+};
+/**
+* Get the text to be rendered.
+* @return {string|undefined} Text.
+* @api
+*/
+
+
+Text.prototype.getText = function getText() {
+  return this.text_;
+};
+/**
+* Get the text alignment.
+* @return {string|undefined} Text align.
+* @api
+*/
+
+
+Text.prototype.getTextAlign = function getTextAlign() {
+  return this.textAlign_;
+};
+/**
+* Get the text baseline.
+* @return {string|undefined} Text baseline.
+* @api
+*/
+
+
+Text.prototype.getTextBaseline = function getTextBaseline() {
+  return this.textBaseline_;
+};
+/**
+* Get the background fill style for the text.
+* @return {import("./Fill.js").default} Fill style.
+* @api
+*/
+
+
+Text.prototype.getBackgroundFill = function getBackgroundFill() {
+  return this.backgroundFill_;
+};
+/**
+* Get the background stroke style for the text.
+* @return {import("./Stroke.js").default} Stroke style.
+* @api
+*/
+
+
+Text.prototype.getBackgroundStroke = function getBackgroundStroke() {
+  return this.backgroundStroke_;
+};
+/**
+* Get the padding for the text.
+* @return {Array<number>} Padding.
+* @api
+*/
+
+
+Text.prototype.getPadding = function getPadding() {
+  return this.padding_;
+};
+/**
+* Set the `overflow` property.
+*
+* @param {boolean} overflow Let text overflow the path that it follows.
+* @api
+*/
+
+
+Text.prototype.setOverflow = function setOverflow(overflow) {
+  this.overflow_ = overflow;
+};
+/**
+* Set the font.
+*
+* @param {string|undefined} font Font.
+* @api
+*/
+
+
+Text.prototype.setFont = function setFont(font) {
+  this.font_ = font;
+};
+/**
+* Set the maximum angle between adjacent characters.
+*
+* @param {number} maxAngle Angle in radians.
+* @api
+*/
+
+
+Text.prototype.setMaxAngle = function setMaxAngle(maxAngle) {
+  this.maxAngle_ = maxAngle;
+};
+/**
+* Set the x offset.
+*
+* @param {number} offsetX Horizontal text offset.
+* @api
+*/
+
+
+Text.prototype.setOffsetX = function setOffsetX(offsetX) {
+  this.offsetX_ = offsetX;
+};
+/**
+* Set the y offset.
+*
+* @param {number} offsetY Vertical text offset.
+* @api
+*/
+
+
+Text.prototype.setOffsetY = function setOffsetY(offsetY) {
+  this.offsetY_ = offsetY;
+};
+/**
+* Set the text placement.
+*
+* @param {import("./TextPlacement.js").default|string} placement Placement.
+* @api
+*/
+
+
+Text.prototype.setPlacement = function setPlacement(placement) {
+  this.placement_ = placement;
+};
+/**
+* Set the fill.
+*
+* @param {import("./Fill.js").default} fill Fill style.
+* @api
+*/
+
+
+Text.prototype.setFill = function setFill(fill) {
+  this.fill_ = fill;
+};
+/**
+* Set the rotation.
+*
+* @param {number|undefined} rotation Rotation.
+* @api
+*/
+
+
+Text.prototype.setRotation = function setRotation(rotation) {
+  this.rotation_ = rotation;
+};
+/**
+* Set the scale.
+*
+* @param {number|undefined} scale Scale.
+* @api
+*/
+
+
+Text.prototype.setScale = function setScale(scale) {
+  this.scale_ = scale;
+};
+/**
+* Set the stroke.
+*
+* @param {import("./Stroke.js").default} stroke Stroke style.
+* @api
+*/
+
+
+Text.prototype.setStroke = function setStroke(stroke) {
+  this.stroke_ = stroke;
+};
+/**
+* Set the text.
+*
+* @param {string|undefined} text Text.
+* @api
+*/
+
+
+Text.prototype.setText = function setText(text) {
+  this.text_ = text;
+};
+/**
+* Set the text alignment.
+*
+* @param {string|undefined} textAlign Text align.
+* @api
+*/
+
+
+Text.prototype.setTextAlign = function setTextAlign(textAlign) {
+  this.textAlign_ = textAlign;
+};
+/**
+* Set the text baseline.
+*
+* @param {string|undefined} textBaseline Text baseline.
+* @api
+*/
+
+
+Text.prototype.setTextBaseline = function setTextBaseline(textBaseline) {
+  this.textBaseline_ = textBaseline;
+};
+/**
+* Set the background fill.
+*
+* @param {import("./Fill.js").default} fill Fill style.
+* @api
+*/
+
+
+Text.prototype.setBackgroundFill = function setBackgroundFill(fill) {
+  this.backgroundFill_ = fill;
+};
+/**
+* Set the background stroke.
+*
+* @param {import("./Stroke.js").default} stroke Stroke style.
+* @api
+*/
+
+
+Text.prototype.setBackgroundStroke = function setBackgroundStroke(stroke) {
+  this.backgroundStroke_ = stroke;
+};
+/**
+* Set the padding (`[top, right, bottom, left]`).
+*
+* @param {!Array<number>} padding Padding.
+* @api
+*/
+
+
+Text.prototype.setPadding = function setPadding(padding) {
+  this.padding_ = padding;
+};
+
+var _default = Text;
+exports.default = _default;
+},{"./Fill.js":"../node_modules/ol/style/Fill.js","./TextPlacement.js":"../node_modules/ol/style/TextPlacement.js"}],"../node_modules/ol/format/KML.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.getDefaultFillStyle = getDefaultFillStyle;
+exports.getDefaultImageStyle = getDefaultImageStyle;
+exports.getDefaultStrokeStyle = getDefaultStrokeStyle;
+exports.getDefaultTextStyle = getDefaultTextStyle;
+exports.getDefaultStyle = getDefaultStyle;
+exports.getDefaultStyleArray = getDefaultStyleArray;
+exports.readFlatCoordinates = readFlatCoordinates;
+exports.default = void 0;
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _array = require("../array.js");
+
+var _asserts = require("../asserts.js");
+
+var _color = require("../color.js");
+
+var _Feature2 = require("./Feature.js");
+
+var _XMLFeature = _interopRequireDefault(require("./XMLFeature.js"));
+
+var _xsd = require("./xsd.js");
+
+var _GeometryCollection = _interopRequireDefault(require("../geom/GeometryCollection.js"));
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _GeometryType = _interopRequireDefault(require("../geom/GeometryType.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _MultiPoint = _interopRequireDefault(require("../geom/MultiPoint.js"));
+
+var _MultiPolygon = _interopRequireDefault(require("../geom/MultiPolygon.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _Polygon = _interopRequireDefault(require("../geom/Polygon.js"));
+
+var _math = require("../math.js");
+
+var _proj = require("../proj.js");
+
+var _Fill = _interopRequireDefault(require("../style/Fill.js"));
+
+var _Icon = _interopRequireDefault(require("../style/Icon.js"));
+
+var _IconAnchorUnits = _interopRequireDefault(require("../style/IconAnchorUnits.js"));
+
+var _IconOrigin = _interopRequireDefault(require("../style/IconOrigin.js"));
+
+var _Stroke = _interopRequireDefault(require("../style/Stroke.js"));
+
+var _Style = _interopRequireDefault(require("../style/Style.js"));
+
+var _Text = _interopRequireDefault(require("../style/Text.js"));
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/KML
+ */
+
+/**
+ * @typedef {Object} Vec2
+ * @property {number} x
+ * @property {IconAnchorUnits} xunits
+ * @property {number} y
+ * @property {IconAnchorUnits} yunits
+ * @property {IconOrigin} origin
+ */
+
+/**
+ * @typedef {Object} GxTrackObject
+ * @property {Array<number>} flatCoordinates
+ * @property {Array<number>} whens
+ */
+
+/**
+ * @const
+ * @type {Array<string>}
+ */
+var GX_NAMESPACE_URIS = ['http://www.google.com/kml/ext/2.2'];
+/**
+ * @const
+ * @type {Array<null|string>}
+ */
+
+var NAMESPACE_URIS = [null, 'http://earth.google.com/kml/2.0', 'http://earth.google.com/kml/2.1', 'http://earth.google.com/kml/2.2', 'http://www.opengis.net/kml/2.2'];
+/**
+ * @const
+ * @type {string}
+ */
+
+var SCHEMA_LOCATION = 'http://www.opengis.net/kml/2.2 ' + 'https://developers.google.com/kml/schema/kml22gx.xsd';
+/**
+ * @type {Object<string, IconAnchorUnits>}
+ */
+
+var ICON_ANCHOR_UNITS_MAP = {
+  'fraction': _IconAnchorUnits.default.FRACTION,
+  'pixels': _IconAnchorUnits.default.PIXELS,
+  'insetPixels': _IconAnchorUnits.default.PIXELS
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var PLACEMARK_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ExtendedData': extendedDataParser,
+  'Region': regionParser,
+  'MultiGeometry': (0, _xml.makeObjectPropertySetter)(readMultiGeometry, 'geometry'),
+  'LineString': (0, _xml.makeObjectPropertySetter)(readLineString, 'geometry'),
+  'LinearRing': (0, _xml.makeObjectPropertySetter)(readLinearRing, 'geometry'),
+  'Point': (0, _xml.makeObjectPropertySetter)(readPoint, 'geometry'),
+  'Polygon': (0, _xml.makeObjectPropertySetter)(readPolygon, 'geometry'),
+  'Style': (0, _xml.makeObjectPropertySetter)(readStyle),
+  'StyleMap': placemarkStyleMapParser,
+  'address': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'description': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'name': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'open': (0, _xml.makeObjectPropertySetter)(_xsd.readBoolean),
+  'phoneNumber': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'styleUrl': (0, _xml.makeObjectPropertySetter)(readURI),
+  'visibility': (0, _xml.makeObjectPropertySetter)(_xsd.readBoolean)
+}, (0, _xml.makeStructureNS)(GX_NAMESPACE_URIS, {
+  'MultiTrack': (0, _xml.makeObjectPropertySetter)(readGxMultiTrack, 'geometry'),
+  'Track': (0, _xml.makeObjectPropertySetter)(readGxTrack, 'geometry')
+}));
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var NETWORK_LINK_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ExtendedData': extendedDataParser,
+  'Region': regionParser,
+  'Link': linkParser,
+  'address': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'description': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'name': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'open': (0, _xml.makeObjectPropertySetter)(_xsd.readBoolean),
+  'phoneNumber': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'visibility': (0, _xml.makeObjectPropertySetter)(_xsd.readBoolean)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var LINK_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'href': (0, _xml.makeObjectPropertySetter)(readURI)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var REGION_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'LatLonAltBox': latLonAltBoxParser,
+  'Lod': lodParser
+});
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+var KML_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['Document', 'Placemark']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var KML_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Document': (0, _xml.makeChildAppender)(writeDocument),
+  'Placemark': (0, _xml.makeChildAppender)(writePlacemark)
+});
+/**
+ * @type {import("../color.js").Color}
+ */
+
+var DEFAULT_COLOR;
+/**
+ * @type {Fill}
+ */
+
+var DEFAULT_FILL_STYLE = null;
+/**
+ * Get the default fill style (or null if not yet set).
+ * @return {Fill} The default fill style.
+ */
+
+function getDefaultFillStyle() {
+  return DEFAULT_FILL_STYLE;
+}
+/**
+ * @type {import("../size.js").Size}
+ */
+
+
+var DEFAULT_IMAGE_STYLE_ANCHOR;
+/**
+ * @type {IconAnchorUnits}
+ */
+
+var DEFAULT_IMAGE_STYLE_ANCHOR_X_UNITS;
+/**
+ * @type {IconAnchorUnits}
+ */
+
+var DEFAULT_IMAGE_STYLE_ANCHOR_Y_UNITS;
+/**
+ * @type {import("../size.js").Size}
+ */
+
+var DEFAULT_IMAGE_STYLE_SIZE;
+/**
+ * @type {string}
+ */
+
+var DEFAULT_IMAGE_STYLE_SRC;
+/**
+ * @type {number}
+ */
+
+var DEFAULT_IMAGE_SCALE_MULTIPLIER;
+/**
+ * @type {import("../style/Image.js").default}
+ */
+
+var DEFAULT_IMAGE_STYLE = null;
+/**
+ * Get the default image style (or null if not yet set).
+ * @return {import("../style/Image.js").default} The default image style.
+ */
+
+function getDefaultImageStyle() {
+  return DEFAULT_IMAGE_STYLE;
+}
+/**
+ * @type {string}
+ */
+
+
+var DEFAULT_NO_IMAGE_STYLE;
+/**
+ * @type {Stroke}
+ */
+
+var DEFAULT_STROKE_STYLE = null;
+/**
+ * Get the default stroke style (or null if not yet set).
+ * @return {Stroke} The default stroke style.
+ */
+
+function getDefaultStrokeStyle() {
+  return DEFAULT_STROKE_STYLE;
+}
+/**
+ * @type {Stroke}
+ */
+
+
+var DEFAULT_TEXT_STROKE_STYLE;
+/**
+ * @type {Text}
+ */
+
+var DEFAULT_TEXT_STYLE = null;
+/**
+ * Get the default text style (or null if not yet set).
+ * @return {Text} The default text style.
+ */
+
+function getDefaultTextStyle() {
+  return DEFAULT_TEXT_STYLE;
+}
+/**
+ * @type {Style}
+ */
+
+
+var DEFAULT_STYLE = null;
+/**
+ * Get the default style (or null if not yet set).
+ * @return {Style} The default style.
+ */
+
+function getDefaultStyle() {
+  return DEFAULT_STYLE;
+}
+/**
+ * @type {Array<Style>}
+ */
+
+
+var DEFAULT_STYLE_ARRAY = null;
+/**
+ * Get the default style array (or null if not yet set).
+ * @return {Array<Style>} The default style.
+ */
+
+function getDefaultStyleArray() {
+  return DEFAULT_STYLE_ARRAY;
+}
+
+function createStyleDefaults() {
+  DEFAULT_COLOR = [255, 255, 255, 1];
+  DEFAULT_FILL_STYLE = new _Fill.default({
+    color: DEFAULT_COLOR
+  });
+  DEFAULT_IMAGE_STYLE_ANCHOR = [20, 2]; // FIXME maybe [8, 32] ?
+
+  DEFAULT_IMAGE_STYLE_ANCHOR_X_UNITS = _IconAnchorUnits.default.PIXELS;
+  DEFAULT_IMAGE_STYLE_ANCHOR_Y_UNITS = _IconAnchorUnits.default.PIXELS;
+  DEFAULT_IMAGE_STYLE_SIZE = [64, 64];
+  DEFAULT_IMAGE_STYLE_SRC = 'https://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png';
+  DEFAULT_IMAGE_SCALE_MULTIPLIER = 0.5;
+  DEFAULT_IMAGE_STYLE = new _Icon.default({
+    anchor: DEFAULT_IMAGE_STYLE_ANCHOR,
+    anchorOrigin: _IconOrigin.default.BOTTOM_LEFT,
+    anchorXUnits: DEFAULT_IMAGE_STYLE_ANCHOR_X_UNITS,
+    anchorYUnits: DEFAULT_IMAGE_STYLE_ANCHOR_Y_UNITS,
+    crossOrigin: 'anonymous',
+    rotation: 0,
+    scale: DEFAULT_IMAGE_SCALE_MULTIPLIER,
+    size: DEFAULT_IMAGE_STYLE_SIZE,
+    src: DEFAULT_IMAGE_STYLE_SRC
+  });
+  DEFAULT_NO_IMAGE_STYLE = 'NO_IMAGE';
+  DEFAULT_STROKE_STYLE = new _Stroke.default({
+    color: DEFAULT_COLOR,
+    width: 1
+  });
+  DEFAULT_TEXT_STROKE_STYLE = new _Stroke.default({
+    color: [51, 51, 51, 1],
+    width: 2
+  });
+  DEFAULT_TEXT_STYLE = new _Text.default({
+    font: 'bold 16px Helvetica',
+    fill: DEFAULT_FILL_STYLE,
+    stroke: DEFAULT_TEXT_STROKE_STYLE,
+    scale: 0.8
+  });
+  DEFAULT_STYLE = new _Style.default({
+    fill: DEFAULT_FILL_STYLE,
+    image: DEFAULT_IMAGE_STYLE,
+    text: DEFAULT_TEXT_STYLE,
+    stroke: DEFAULT_STROKE_STYLE,
+    zIndex: 0
+  });
+  DEFAULT_STYLE_ARRAY = [DEFAULT_STYLE];
+}
+/**
+ * @typedef {Object} Options
+ * @property {boolean} [extractStyles=true] Extract styles from the KML.
+ * @property {boolean} [showPointNames=true] Show names as labels for placemarks which contain points.
+ * @property {Array<Style>} [defaultStyle] Default style. The
+ * default default style is the same as Google Earth.
+ * @property {boolean} [writeStyles=true] Write styles into KML.
+ */
+
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the KML format.
+ *
+ * {@link module:ol/format/KML~KML#readFeature} will read the first feature from
+ * a KML source.
+ *
+ * MultiGeometries are converted into GeometryCollections if they are a mix of
+ * geometry types, and into MultiPoint/MultiLineString/MultiPolygon if they are
+ * all of the same type.
+ *
+ * Note that the KML format uses the URL() constructor. Older browsers such as IE
+ * which do not support this will need a URL polyfill to be loaded before use.
+ *
+ * @api
+ */
+
+
+var KML =
+/*@__PURE__*/
+function (XMLFeature) {
+  function KML(opt_options) {
+    XMLFeature.call(this);
+    var options = opt_options ? opt_options : {};
+
+    if (!DEFAULT_STYLE_ARRAY) {
+      createStyleDefaults();
+    }
+    /**
+     * @inheritDoc
+     */
+
+
+    this.dataProjection = (0, _proj.get)('EPSG:4326');
+    /**
+     * @private
+     * @type {Array<Style>}
+     */
+
+    this.defaultStyle_ = options.defaultStyle ? options.defaultStyle : DEFAULT_STYLE_ARRAY;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.extractStyles_ = options.extractStyles !== undefined ? options.extractStyles : true;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.writeStyles_ = options.writeStyles !== undefined ? options.writeStyles : true;
+    /**
+     * @private
+     * @type {!Object<string, (Array<Style>|string)>}
+     */
+
+    this.sharedStyles_ = {};
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.showPointNames_ = options.showPointNames !== undefined ? options.showPointNames : true;
+  }
+
+  if (XMLFeature) KML.__proto__ = XMLFeature;
+  KML.prototype = Object.create(XMLFeature && XMLFeature.prototype);
+  KML.prototype.constructor = KML;
+  /**
+   * @param {Node} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<Feature>|undefined} Features.
+   */
+
+  KML.prototype.readDocumentOrFolder_ = function readDocumentOrFolder_(node, objectStack) {
+    // FIXME use scope somehow
+    var parsersNS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+      'Document': (0, _xml.makeArrayExtender)(this.readDocumentOrFolder_, this),
+      'Folder': (0, _xml.makeArrayExtender)(this.readDocumentOrFolder_, this),
+      'Placemark': (0, _xml.makeArrayPusher)(this.readPlacemark_, this),
+      'Style': this.readSharedStyle_.bind(this),
+      'StyleMap': this.readSharedStyleMap_.bind(this)
+    });
+    /** @type {Array<Feature>} */
+
+    var features = (0, _xml.pushParseAndPop)([], parsersNS, node, objectStack, this);
+
+    if (features) {
+      return features;
+    } else {
+      return undefined;
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Feature|undefined} Feature.
+   */
+
+
+  KML.prototype.readPlacemark_ = function readPlacemark_(node, objectStack) {
+    var object = (0, _xml.pushParseAndPop)({
+      'geometry': null
+    }, PLACEMARK_PARSERS, node, objectStack);
+
+    if (!object) {
+      return undefined;
+    }
+
+    var feature = new _Feature.default();
+    var id = node.getAttribute('id');
+
+    if (id !== null) {
+      feature.setId(id);
+    }
+
+    var options =
+    /** @type {import("./Feature.js").ReadOptions} */
+    objectStack[0];
+    var geometry = object['geometry'];
+
+    if (geometry) {
+      (0, _Feature2.transformWithOptions)(geometry, false, options);
+    }
+
+    feature.setGeometry(geometry);
+    delete object['geometry'];
+
+    if (this.extractStyles_) {
+      var style = object['Style'];
+      var styleUrl = object['styleUrl'];
+      var styleFunction = createFeatureStyleFunction(style, styleUrl, this.defaultStyle_, this.sharedStyles_, this.showPointNames_);
+      feature.setStyle(styleFunction);
+    }
+
+    delete object['Style']; // we do not remove the styleUrl property from the object, so it
+    // gets stored on feature when setProperties is called
+
+    feature.setProperties(object);
+    return feature;
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  KML.prototype.readSharedStyle_ = function readSharedStyle_(node, objectStack) {
+    var id = node.getAttribute('id');
+
+    if (id !== null) {
+      var style = readStyle(node, objectStack);
+
+      if (style) {
+        var styleUri;
+        var baseURI = node.baseURI;
+
+        if (!baseURI || baseURI == 'about:blank') {
+          baseURI = window.location.href;
+        }
+
+        if (baseURI) {
+          var url = new URL('#' + id, baseURI);
+          styleUri = url.href;
+        } else {
+          styleUri = '#' + id;
+        }
+
+        this.sharedStyles_[styleUri] = style;
+      }
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  KML.prototype.readSharedStyleMap_ = function readSharedStyleMap_(node, objectStack) {
+    var id = node.getAttribute('id');
+
+    if (id === null) {
+      return;
+    }
+
+    var styleMapValue = readStyleMapValue(node, objectStack);
+
+    if (!styleMapValue) {
+      return;
+    }
+
+    var styleUri;
+    var baseURI = node.baseURI;
+
+    if (!baseURI || baseURI == 'about:blank') {
+      baseURI = window.location.href;
+    }
+
+    if (baseURI) {
+      var url = new URL('#' + id, baseURI);
+      styleUri = url.href;
+    } else {
+      styleUri = '#' + id;
+    }
+
+    this.sharedStyles_[styleUri] = styleMapValue;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  KML.prototype.readFeatureFromNode = function readFeatureFromNode(node, opt_options) {
+    if (!(0, _array.includes)(NAMESPACE_URIS, node.namespaceURI)) {
+      return null;
+    }
+
+    var feature = this.readPlacemark_(node, [this.getReadOptions(node, opt_options)]);
+
+    if (feature) {
+      return feature;
+    } else {
+      return null;
+    }
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  KML.prototype.readFeaturesFromNode = function readFeaturesFromNode(node, opt_options) {
+    if (!(0, _array.includes)(NAMESPACE_URIS, node.namespaceURI)) {
+      return [];
+    }
+
+    var features;
+    var localName = node.localName;
+
+    if (localName == 'Document' || localName == 'Folder') {
+      features = this.readDocumentOrFolder_(node, [this.getReadOptions(node, opt_options)]);
+
+      if (features) {
+        return features;
+      } else {
+        return [];
+      }
+    } else if (localName == 'Placemark') {
+      var feature = this.readPlacemark_(node, [this.getReadOptions(node, opt_options)]);
+
+      if (feature) {
+        return [feature];
+      } else {
+        return [];
+      }
+    } else if (localName == 'kml') {
+      features = [];
+
+      for (var n = node.firstElementChild; n; n = n.nextElementSibling) {
+        var fs = this.readFeaturesFromNode(n, opt_options);
+
+        if (fs) {
+          (0, _array.extend)(features, fs);
+        }
+      }
+
+      return features;
+    } else {
+      return [];
+    }
+  };
+  /**
+   * Read the name of the KML.
+   *
+   * @param {Document|Element|string} source Source.
+   * @return {string|undefined} Name.
+   * @api
+   */
+
+
+  KML.prototype.readName = function readName(source) {
+    if (!source) {
+      return undefined;
+    } else if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      return this.readNameFromDocument(doc);
+    } else if ((0, _xml.isDocument)(source)) {
+      return this.readNameFromDocument(
+      /** @type {Document} */
+      source);
+    } else {
+      return this.readNameFromNode(
+      /** @type {Element} */
+      source);
+    }
+  };
+  /**
+   * @param {Document} doc Document.
+   * @return {string|undefined} Name.
+   */
+
+
+  KML.prototype.readNameFromDocument = function readNameFromDocument(doc) {
+    for (var n =
+    /** @type {Node} */
+    doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        var name = this.readNameFromNode(
+        /** @type {Element} */
+        n);
+
+        if (name) {
+          return name;
+        }
+      }
+    }
+
+    return undefined;
+  };
+  /**
+   * @param {Element} node Node.
+   * @return {string|undefined} Name.
+   */
+
+
+  KML.prototype.readNameFromNode = function readNameFromNode(node) {
+    for (var n = node.firstElementChild; n; n = n.nextElementSibling) {
+      if ((0, _array.includes)(NAMESPACE_URIS, n.namespaceURI) && n.localName == 'name') {
+        return (0, _xsd.readString)(n);
+      }
+    }
+
+    for (var n$1 = node.firstElementChild; n$1; n$1 = n$1.nextElementSibling) {
+      var localName = n$1.localName;
+
+      if ((0, _array.includes)(NAMESPACE_URIS, n$1.namespaceURI) && (localName == 'Document' || localName == 'Folder' || localName == 'Placemark' || localName == 'kml')) {
+        var name = this.readNameFromNode(n$1);
+
+        if (name) {
+          return name;
+        }
+      }
+    }
+
+    return undefined;
+  };
+  /**
+   * Read the network links of the KML.
+   *
+   * @param {Document|Element|string} source Source.
+   * @return {Array<Object>} Network links.
+   * @api
+   */
+
+
+  KML.prototype.readNetworkLinks = function readNetworkLinks(source) {
+    var networkLinks = [];
+
+    if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      (0, _array.extend)(networkLinks, this.readNetworkLinksFromDocument(doc));
+    } else if ((0, _xml.isDocument)(source)) {
+      (0, _array.extend)(networkLinks, this.readNetworkLinksFromDocument(
+      /** @type {Document} */
+      source));
+    } else {
+      (0, _array.extend)(networkLinks, this.readNetworkLinksFromNode(
+      /** @type {Element} */
+      source));
+    }
+
+    return networkLinks;
+  };
+  /**
+   * @param {Document} doc Document.
+   * @return {Array<Object>} Network links.
+   */
+
+
+  KML.prototype.readNetworkLinksFromDocument = function readNetworkLinksFromDocument(doc) {
+    var networkLinks = [];
+
+    for (var n =
+    /** @type {Node} */
+    doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        (0, _array.extend)(networkLinks, this.readNetworkLinksFromNode(
+        /** @type {Element} */
+        n));
+      }
+    }
+
+    return networkLinks;
+  };
+  /**
+   * @param {Element} node Node.
+   * @return {Array<Object>} Network links.
+   */
+
+
+  KML.prototype.readNetworkLinksFromNode = function readNetworkLinksFromNode(node) {
+    var networkLinks = [];
+
+    for (var n = node.firstElementChild; n; n = n.nextElementSibling) {
+      if ((0, _array.includes)(NAMESPACE_URIS, n.namespaceURI) && n.localName == 'NetworkLink') {
+        var obj = (0, _xml.pushParseAndPop)({}, NETWORK_LINK_PARSERS, n, []);
+        networkLinks.push(obj);
+      }
+    }
+
+    for (var n$1 = node.firstElementChild; n$1; n$1 = n$1.nextElementSibling) {
+      var localName = n$1.localName;
+
+      if ((0, _array.includes)(NAMESPACE_URIS, n$1.namespaceURI) && (localName == 'Document' || localName == 'Folder' || localName == 'kml')) {
+        (0, _array.extend)(networkLinks, this.readNetworkLinksFromNode(n$1));
+      }
+    }
+
+    return networkLinks;
+  };
+  /**
+   * Read the regions of the KML.
+   *
+   * @param {Document|Element|string} source Source.
+   * @return {Array<Object>} Regions.
+   * @api
+   */
+
+
+  KML.prototype.readRegion = function readRegion(source) {
+    var regions = [];
+
+    if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      (0, _array.extend)(regions, this.readRegionFromDocument(doc));
+    } else if ((0, _xml.isDocument)(source)) {
+      (0, _array.extend)(regions, this.readRegionFromDocument(
+      /** @type {Document} */
+      source));
+    } else {
+      (0, _array.extend)(regions, this.readRegionFromNode(
+      /** @type {Element} */
+      source));
+    }
+
+    return regions;
+  };
+  /**
+   * @param {Document} doc Document.
+   * @return {Array<Object>} Region.
+   */
+
+
+  KML.prototype.readRegionFromDocument = function readRegionFromDocument(doc) {
+    var regions = [];
+
+    for (var n =
+    /** @type {Node} */
+    doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        (0, _array.extend)(regions, this.readRegionFromNode(
+        /** @type {Element} */
+        n));
+      }
+    }
+
+    return regions;
+  };
+  /**
+   * @param {Element} node Node.
+   * @return {Array<Object>} Region.
+   * @api
+   */
+
+
+  KML.prototype.readRegionFromNode = function readRegionFromNode(node) {
+    var regions = [];
+
+    for (var n = node.firstElementChild; n; n = n.nextElementSibling) {
+      if ((0, _array.includes)(NAMESPACE_URIS, n.namespaceURI) && n.localName == 'Region') {
+        var obj = (0, _xml.pushParseAndPop)({}, REGION_PARSERS, n, []);
+        regions.push(obj);
+      }
+    }
+
+    for (var n$1 = node.firstElementChild; n$1; n$1 = n$1.nextElementSibling) {
+      var localName = n$1.localName;
+
+      if ((0, _array.includes)(NAMESPACE_URIS, n$1.namespaceURI) && (localName == 'Document' || localName == 'Folder' || localName == 'kml')) {
+        (0, _array.extend)(regions, this.readRegionFromNode(n$1));
+      }
+    }
+
+    return regions;
+  };
+  /**
+   * Encode an array of features in the KML format as an XML node. GeometryCollections,
+   * MultiPoints, MultiLineStrings, and MultiPolygons are output as MultiGeometries.
+   *
+   * @param {Array<Feature>} features Features.
+   * @param {import("./Feature.js").WriteOptions=} opt_options Options.
+   * @return {Node} Node.
+   * @override
+   * @api
+   */
+
+
+  KML.prototype.writeFeaturesNode = function writeFeaturesNode(features, opt_options) {
+    opt_options = this.adaptOptions(opt_options);
+    var kml = (0, _xml.createElementNS)(NAMESPACE_URIS[4], 'kml');
+    var xmlnsUri = 'http://www.w3.org/2000/xmlns/';
+    kml.setAttributeNS(xmlnsUri, 'xmlns:gx', GX_NAMESPACE_URIS[0]);
+    kml.setAttributeNS(xmlnsUri, 'xmlns:xsi', _xml.XML_SCHEMA_INSTANCE_URI);
+    kml.setAttributeNS(_xml.XML_SCHEMA_INSTANCE_URI, 'xsi:schemaLocation', SCHEMA_LOCATION);
+    var
+    /** @type {import("../xml.js").NodeStackItem} */
+    context = {
+      node: kml
+    };
+    /** @type {!Object<string, (Array<Feature>|Feature|undefined)>} */
+
+    var properties = {};
+
+    if (features.length > 1) {
+      properties['Document'] = features;
+    } else if (features.length == 1) {
+      properties['Placemark'] = features[0];
+    }
+
+    var orderedKeys = KML_SEQUENCE[kml.namespaceURI];
+    var values = (0, _xml.makeSequence)(properties, orderedKeys);
+    (0, _xml.pushSerializeAndPop)(context, KML_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, [opt_options], orderedKeys, this);
+    return kml;
+  };
+
+  return KML;
+}(_XMLFeature.default);
+/**
+ * @param {Style|undefined} foundStyle Style.
+ * @param {string} name Name.
+ * @return {Style} style Style.
+ */
+
+
+function createNameStyleFunction(foundStyle, name) {
+  var textStyle = null;
+  var textOffset = [0, 0];
+  var textAlign = 'start';
+
+  if (foundStyle.getImage()) {
+    var imageSize = foundStyle.getImage().getImageSize();
+
+    if (imageSize === null) {
+      imageSize = DEFAULT_IMAGE_STYLE_SIZE;
+    }
+
+    if (imageSize.length == 2) {
+      var imageScale = foundStyle.getImage().getScale(); // Offset the label to be centered to the right of the icon, if there is
+      // one.
+
+      textOffset[0] = imageScale * imageSize[0] / 2;
+      textOffset[1] = -imageScale * imageSize[1] / 2;
+      textAlign = 'left';
+    }
+  }
+
+  if (foundStyle.getText() !== null) {
+    // clone the text style, customizing it with name, alignments and offset.
+    // Note that kml does not support many text options that OpenLayers does (rotation, textBaseline).
+    var foundText = foundStyle.getText();
+    textStyle = foundText.clone();
+    textStyle.setFont(foundText.getFont() || DEFAULT_TEXT_STYLE.getFont());
+    textStyle.setScale(foundText.getScale() || DEFAULT_TEXT_STYLE.getScale());
+    textStyle.setFill(foundText.getFill() || DEFAULT_TEXT_STYLE.getFill());
+    textStyle.setStroke(foundText.getStroke() || DEFAULT_TEXT_STROKE_STYLE);
+  } else {
+    textStyle = DEFAULT_TEXT_STYLE.clone();
+  }
+
+  textStyle.setText(name);
+  textStyle.setOffsetX(textOffset[0]);
+  textStyle.setOffsetY(textOffset[1]);
+  textStyle.setTextAlign(textAlign);
+  var nameStyle = new _Style.default({
+    text: textStyle
+  });
+  return nameStyle;
+}
+/**
+ * @param {Array<Style>|undefined} style Style.
+ * @param {string} styleUrl Style URL.
+ * @param {Array<Style>} defaultStyle Default style.
+ * @param {!Object<string, (Array<Style>|string)>} sharedStyles Shared styles.
+ * @param {boolean|undefined} showPointNames true to show names for point placemarks.
+ * @return {import("../style/Style.js").StyleFunction} Feature style function.
+ */
+
+
+function createFeatureStyleFunction(style, styleUrl, defaultStyle, sharedStyles, showPointNames) {
+  return (
+    /**
+     * @param {Feature} feature feature.
+     * @param {number} resolution Resolution.
+     * @return {Array<Style>} Style.
+     */
+    function (feature, resolution) {
+      var drawName = showPointNames;
+      /** @type {Style|undefined} */
+
+      var nameStyle;
+      var name = '';
+
+      if (drawName) {
+        var geometry = feature.getGeometry();
+
+        if (geometry) {
+          drawName = geometry.getType() === _GeometryType.default.POINT;
+        }
+      }
+
+      if (drawName) {
+        name =
+        /** @type {string} */
+        feature.get('name');
+        drawName = drawName && !!name;
+      }
+
+      if (style) {
+        if (drawName) {
+          nameStyle = createNameStyleFunction(style[0], name);
+          return style.concat(nameStyle);
+        }
+
+        return style;
+      }
+
+      if (styleUrl) {
+        var foundStyle = findStyle(styleUrl, defaultStyle, sharedStyles);
+
+        if (drawName) {
+          nameStyle = createNameStyleFunction(foundStyle[0], name);
+          return foundStyle.concat(nameStyle);
+        }
+
+        return foundStyle;
+      }
+
+      if (drawName) {
+        nameStyle = createNameStyleFunction(defaultStyle[0], name);
+        return defaultStyle.concat(nameStyle);
+      }
+
+      return defaultStyle;
+    }
+  );
+}
+/**
+ * @param {Array<Style>|string|undefined} styleValue Style value.
+ * @param {Array<Style>} defaultStyle Default style.
+ * @param {!Object<string, (Array<Style>|string)>} sharedStyles
+ * Shared styles.
+ * @return {Array<Style>} Style.
+ */
+
+
+function findStyle(styleValue, defaultStyle, sharedStyles) {
+  if (Array.isArray(styleValue)) {
+    return styleValue;
+  } else if (typeof styleValue === 'string') {
+    // KML files in the wild occasionally forget the leading `#` on styleUrls
+    // defined in the same document.  Add a leading `#` if it enables to find
+    // a style.
+    if (!(styleValue in sharedStyles) && '#' + styleValue in sharedStyles) {
+      styleValue = '#' + styleValue;
+    }
+
+    return findStyle(sharedStyles[styleValue], defaultStyle, sharedStyles);
+  } else {
+    return defaultStyle;
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @return {import("../color.js").Color|undefined} Color.
+ */
+
+
+function readColor(node) {
+  var s = (0, _xml.getAllTextContent)(node, false); // The KML specification states that colors should not include a leading `#`
+  // but we tolerate them.
+
+  var m = /^\s*#?\s*([0-9A-Fa-f]{8})\s*$/.exec(s);
+
+  if (m) {
+    var hexColor = m[1];
+    return [parseInt(hexColor.substr(6, 2), 16), parseInt(hexColor.substr(4, 2), 16), parseInt(hexColor.substr(2, 2), 16), parseInt(hexColor.substr(0, 2), 16) / 255];
+  } else {
+    return undefined;
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @return {Array<number>|undefined} Flat coordinates.
+ */
+
+
+function readFlatCoordinates(node) {
+  var s = (0, _xml.getAllTextContent)(node, false);
+  var flatCoordinates = []; // The KML specification states that coordinate tuples should not include
+  // spaces, but we tolerate them.
+
+  var re = /^\s*([+\-]?\d*\.?\d+(?:e[+\-]?\d+)?)\s*,\s*([+\-]?\d*\.?\d+(?:e[+\-]?\d+)?)(?:\s*,\s*([+\-]?\d*\.?\d+(?:e[+\-]?\d+)?))?\s*/i;
+  var m;
+
+  while (m = re.exec(s)) {
+    var x = parseFloat(m[1]);
+    var y = parseFloat(m[2]);
+    var z = m[3] ? parseFloat(m[3]) : 0;
+    flatCoordinates.push(x, y, z);
+    s = s.substr(m[0].length);
+  }
+
+  if (s !== '') {
+    return undefined;
+  }
+
+  return flatCoordinates;
+}
+/**
+ * @param {Node} node Node.
+ * @return {string} URI.
+ */
+
+
+function readURI(node) {
+  var s = (0, _xml.getAllTextContent)(node, false).trim();
+  var baseURI = node.baseURI;
+
+  if (!baseURI || baseURI == 'about:blank') {
+    baseURI = window.location.href;
+  }
+
+  if (baseURI) {
+    var url = new URL(s, baseURI);
+    return url.href;
+  } else {
+    return s;
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @return {Vec2} Vec2.
+ */
+
+
+function readVec2(node) {
+  var xunits = node.getAttribute('xunits');
+  var yunits = node.getAttribute('yunits');
+  var origin;
+
+  if (xunits !== 'insetPixels') {
+    if (yunits !== 'insetPixels') {
+      origin = _IconOrigin.default.BOTTOM_LEFT;
+    } else {
+      origin = _IconOrigin.default.TOP_LEFT;
+    }
+  } else {
+    if (yunits !== 'insetPixels') {
+      origin = _IconOrigin.default.BOTTOM_RIGHT;
+    } else {
+      origin = _IconOrigin.default.TOP_RIGHT;
+    }
+  }
+
+  return {
+    x: parseFloat(node.getAttribute('x')),
+    xunits: ICON_ANCHOR_UNITS_MAP[xunits],
+    y: parseFloat(node.getAttribute('y')),
+    yunits: ICON_ANCHOR_UNITS_MAP[yunits],
+    origin: origin
+  };
+}
+/**
+ * @param {Node} node Node.
+ * @return {number|undefined} Scale.
+ */
+
+
+function readScale(node) {
+  return (0, _xsd.readDecimal)(node);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var STYLE_MAP_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Pair': pairDataParser
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Array<Style>|string|undefined} StyleMap.
+ */
+
+function readStyleMapValue(node, objectStack) {
+  return (0, _xml.pushParseAndPop)(undefined, STYLE_MAP_PARSERS, node, objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var ICON_STYLE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Icon': (0, _xml.makeObjectPropertySetter)(readIcon),
+  'heading': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'hotSpot': (0, _xml.makeObjectPropertySetter)(readVec2),
+  'scale': (0, _xml.makeObjectPropertySetter)(readScale)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function iconStyleParser(node, objectStack) {
+  // FIXME refreshMode
+  // FIXME refreshInterval
+  // FIXME viewRefreshTime
+  // FIXME viewBoundScale
+  // FIXME viewFormat
+  // FIXME httpQuery
+  var object = (0, _xml.pushParseAndPop)({}, ICON_STYLE_PARSERS, node, objectStack);
+
+  if (!object) {
+    return;
+  }
+
+  var styleObject =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  var IconObject = 'Icon' in object ? object['Icon'] : {};
+  var drawIcon = !('Icon' in object) || Object.keys(IconObject).length > 0;
+  var src;
+  var href =
+  /** @type {string|undefined} */
+  IconObject['href'];
+
+  if (href) {
+    src = href;
+  } else if (drawIcon) {
+    src = DEFAULT_IMAGE_STYLE_SRC;
+  }
+
+  var anchor, anchorXUnits, anchorYUnits;
+  var anchorOrigin = _IconOrigin.default.BOTTOM_LEFT;
+  var hotSpot =
+  /** @type {Vec2|undefined} */
+  object['hotSpot'];
+
+  if (hotSpot) {
+    anchor = [hotSpot.x, hotSpot.y];
+    anchorXUnits = hotSpot.xunits;
+    anchorYUnits = hotSpot.yunits;
+    anchorOrigin = hotSpot.origin;
+  } else if (src === DEFAULT_IMAGE_STYLE_SRC) {
+    anchor = DEFAULT_IMAGE_STYLE_ANCHOR;
+    anchorXUnits = DEFAULT_IMAGE_STYLE_ANCHOR_X_UNITS;
+    anchorYUnits = DEFAULT_IMAGE_STYLE_ANCHOR_Y_UNITS;
+  } else if (/^http:\/\/maps\.(?:google|gstatic)\.com\//.test(src)) {
+    anchor = [0.5, 0];
+    anchorXUnits = _IconAnchorUnits.default.FRACTION;
+    anchorYUnits = _IconAnchorUnits.default.FRACTION;
+  }
+
+  var offset;
+  var x =
+  /** @type {number|undefined} */
+  IconObject['x'];
+  var y =
+  /** @type {number|undefined} */
+  IconObject['y'];
+
+  if (x !== undefined && y !== undefined) {
+    offset = [x, y];
+  }
+
+  var size;
+  var w =
+  /** @type {number|undefined} */
+  IconObject['w'];
+  var h =
+  /** @type {number|undefined} */
+  IconObject['h'];
+
+  if (w !== undefined && h !== undefined) {
+    size = [w, h];
+  }
+
+  var rotation;
+  var heading =
+  /** @type {number} */
+  object['heading'];
+
+  if (heading !== undefined) {
+    rotation = (0, _math.toRadians)(heading);
+  }
+
+  var scale =
+  /** @type {number|undefined} */
+  object['scale'];
+
+  if (drawIcon) {
+    if (src == DEFAULT_IMAGE_STYLE_SRC) {
+      size = DEFAULT_IMAGE_STYLE_SIZE;
+
+      if (scale === undefined) {
+        scale = DEFAULT_IMAGE_SCALE_MULTIPLIER;
+      }
+    }
+
+    var imageStyle = new _Icon.default({
+      anchor: anchor,
+      anchorOrigin: anchorOrigin,
+      anchorXUnits: anchorXUnits,
+      anchorYUnits: anchorYUnits,
+      crossOrigin: 'anonymous',
+      // FIXME should this be configurable?
+      offset: offset,
+      offsetOrigin: _IconOrigin.default.BOTTOM_LEFT,
+      rotation: rotation,
+      scale: scale,
+      size: size,
+      src: src
+    });
+    styleObject['imageStyle'] = imageStyle;
+  } else {
+    // handle the case when we explicitly want to draw no icon.
+    styleObject['imageStyle'] = DEFAULT_NO_IMAGE_STYLE;
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var LABEL_STYLE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'color': (0, _xml.makeObjectPropertySetter)(readColor),
+  'scale': (0, _xml.makeObjectPropertySetter)(readScale)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function labelStyleParser(node, objectStack) {
+  // FIXME colorMode
+  var object = (0, _xml.pushParseAndPop)({}, LABEL_STYLE_PARSERS, node, objectStack);
+
+  if (!object) {
+    return;
+  }
+
+  var styleObject = objectStack[objectStack.length - 1];
+  var textStyle = new _Text.default({
+    fill: new _Fill.default({
+      color:
+      /** @type {import("../color.js").Color} */
+      'color' in object ? object['color'] : DEFAULT_COLOR
+    }),
+    scale:
+    /** @type {number|undefined} */
+    object['scale']
+  });
+  styleObject['textStyle'] = textStyle;
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var LINE_STYLE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'color': (0, _xml.makeObjectPropertySetter)(readColor),
+  'width': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function lineStyleParser(node, objectStack) {
+  // FIXME colorMode
+  // FIXME gx:outerColor
+  // FIXME gx:outerWidth
+  // FIXME gx:physicalWidth
+  // FIXME gx:labelVisibility
+  var object = (0, _xml.pushParseAndPop)({}, LINE_STYLE_PARSERS, node, objectStack);
+
+  if (!object) {
+    return;
+  }
+
+  var styleObject = objectStack[objectStack.length - 1];
+  var strokeStyle = new _Stroke.default({
+    color:
+    /** @type {import("../color.js").Color} */
+    'color' in object ? object['color'] : DEFAULT_COLOR,
+    width:
+    /** @type {number} */
+    'width' in object ? object['width'] : 1
+  });
+  styleObject['strokeStyle'] = strokeStyle;
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var POLY_STYLE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'color': (0, _xml.makeObjectPropertySetter)(readColor),
+  'fill': (0, _xml.makeObjectPropertySetter)(_xsd.readBoolean),
+  'outline': (0, _xml.makeObjectPropertySetter)(_xsd.readBoolean)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function polyStyleParser(node, objectStack) {
+  // FIXME colorMode
+  var object = (0, _xml.pushParseAndPop)({}, POLY_STYLE_PARSERS, node, objectStack);
+
+  if (!object) {
+    return;
+  }
+
+  var styleObject = objectStack[objectStack.length - 1];
+  var fillStyle = new _Fill.default({
+    color:
+    /** @type {import("../color.js").Color} */
+    'color' in object ? object['color'] : DEFAULT_COLOR
+  });
+  styleObject['fillStyle'] = fillStyle;
+  var fill =
+  /** @type {boolean|undefined} */
+  object['fill'];
+
+  if (fill !== undefined) {
+    styleObject['fill'] = fill;
+  }
+
+  var outline =
+  /** @type {boolean|undefined} */
+  object['outline'];
+
+  if (outline !== undefined) {
+    styleObject['outline'] = outline;
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var FLAT_LINEAR_RING_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'coordinates': (0, _xml.makeReplacer)(readFlatCoordinates)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Array<number>} LinearRing flat coordinates.
+ */
+
+function readFlatLinearRing(node, objectStack) {
+  return (0, _xml.pushParseAndPop)(null, FLAT_LINEAR_RING_PARSERS, node, objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function gxCoordParser(node, objectStack) {
+  var gxTrackObject =
+  /** @type {GxTrackObject} */
+  objectStack[objectStack.length - 1];
+  var flatCoordinates = gxTrackObject.flatCoordinates;
+  var s = (0, _xml.getAllTextContent)(node, false);
+  var re = /^\s*([+\-]?\d+(?:\.\d*)?(?:e[+\-]?\d*)?)\s+([+\-]?\d+(?:\.\d*)?(?:e[+\-]?\d*)?)\s+([+\-]?\d+(?:\.\d*)?(?:e[+\-]?\d*)?)\s*$/i;
+  var m = re.exec(s);
+
+  if (m) {
+    var x = parseFloat(m[1]);
+    var y = parseFloat(m[2]);
+    var z = parseFloat(m[3]);
+    flatCoordinates.push(x, y, z, 0);
+  } else {
+    flatCoordinates.push(0, 0, 0, 0);
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var GX_MULTITRACK_GEOMETRY_PARSERS = (0, _xml.makeStructureNS)(GX_NAMESPACE_URIS, {
+  'Track': (0, _xml.makeArrayPusher)(readGxTrack)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {MultiLineString|undefined} MultiLineString.
+ */
+
+function readGxMultiTrack(node, objectStack) {
+  var lineStrings = (0, _xml.pushParseAndPop)([], GX_MULTITRACK_GEOMETRY_PARSERS, node, objectStack);
+
+  if (!lineStrings) {
+    return undefined;
+  }
+
+  return new _MultiLineString.default(lineStrings);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var GX_TRACK_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'when': whenParser
+}, (0, _xml.makeStructureNS)(GX_NAMESPACE_URIS, {
+  'coord': gxCoordParser
+}));
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {LineString|undefined} LineString.
+ */
+
+function readGxTrack(node, objectStack) {
+  var gxTrackObject = (0, _xml.pushParseAndPop)(
+  /** @type {GxTrackObject} */
+  {
+    flatCoordinates: [],
+    whens: []
+  }, GX_TRACK_PARSERS, node, objectStack);
+
+  if (!gxTrackObject) {
+    return undefined;
+  }
+
+  var flatCoordinates = gxTrackObject.flatCoordinates;
+  var whens = gxTrackObject.whens;
+
+  for (var i = 0, ii = Math.min(flatCoordinates.length, whens.length); i < ii; ++i) {
+    flatCoordinates[4 * i + 3] = whens[i];
+  }
+
+  return new _LineString.default(flatCoordinates, _GeometryLayout.default.XYZM);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var ICON_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'href': (0, _xml.makeObjectPropertySetter)(readURI)
+}, (0, _xml.makeStructureNS)(GX_NAMESPACE_URIS, {
+  'x': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'y': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'w': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'h': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal)
+}));
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object} Icon object.
+ */
+
+function readIcon(node, objectStack) {
+  var iconObject = (0, _xml.pushParseAndPop)({}, ICON_PARSERS, node, objectStack);
+
+  if (iconObject) {
+    return iconObject;
+  } else {
+    return null;
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var GEOMETRY_FLAT_COORDINATES_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'coordinates': (0, _xml.makeReplacer)(readFlatCoordinates)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Array<number>} Flat coordinates.
+ */
+
+function readFlatCoordinatesFromNode(node, objectStack) {
+  return (0, _xml.pushParseAndPop)(null, GEOMETRY_FLAT_COORDINATES_PARSERS, node, objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var EXTRUDE_AND_ALTITUDE_MODE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'extrude': (0, _xml.makeObjectPropertySetter)(_xsd.readBoolean),
+  'tessellate': (0, _xml.makeObjectPropertySetter)(_xsd.readBoolean),
+  'altitudeMode': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {LineString|undefined} LineString.
+ */
+
+function readLineString(node, objectStack) {
+  var properties = (0, _xml.pushParseAndPop)({}, EXTRUDE_AND_ALTITUDE_MODE_PARSERS, node, objectStack);
+  var flatCoordinates = readFlatCoordinatesFromNode(node, objectStack);
+
+  if (flatCoordinates) {
+    var lineString = new _LineString.default(flatCoordinates, _GeometryLayout.default.XYZ);
+    lineString.setProperties(properties);
+    return lineString;
+  } else {
+    return undefined;
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Polygon|undefined} Polygon.
+ */
+
+
+function readLinearRing(node, objectStack) {
+  var properties = (0, _xml.pushParseAndPop)({}, EXTRUDE_AND_ALTITUDE_MODE_PARSERS, node, objectStack);
+  var flatCoordinates = readFlatCoordinatesFromNode(node, objectStack);
+
+  if (flatCoordinates) {
+    var polygon = new _Polygon.default(flatCoordinates, _GeometryLayout.default.XYZ, [flatCoordinates.length]);
+    polygon.setProperties(properties);
+    return polygon;
+  } else {
+    return undefined;
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var MULTI_GEOMETRY_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'LineString': (0, _xml.makeArrayPusher)(readLineString),
+  'LinearRing': (0, _xml.makeArrayPusher)(readLinearRing),
+  'MultiGeometry': (0, _xml.makeArrayPusher)(readMultiGeometry),
+  'Point': (0, _xml.makeArrayPusher)(readPoint),
+  'Polygon': (0, _xml.makeArrayPusher)(readPolygon)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {import("../geom/Geometry.js").default} Geometry.
+ */
+
+function readMultiGeometry(node, objectStack) {
+  var geometries = (0, _xml.pushParseAndPop)([], MULTI_GEOMETRY_PARSERS, node, objectStack);
+
+  if (!geometries) {
+    return null;
+  }
+
+  if (geometries.length === 0) {
+    return new _GeometryCollection.default(geometries);
+  }
+
+  var multiGeometry;
+  var homogeneous = true;
+  var type = geometries[0].getType();
+  var geometry;
+
+  for (var i = 1, ii = geometries.length; i < ii; ++i) {
+    geometry = geometries[i];
+
+    if (geometry.getType() != type) {
+      homogeneous = false;
+      break;
+    }
+  }
+
+  if (homogeneous) {
+    var layout;
+    var flatCoordinates;
+
+    if (type == _GeometryType.default.POINT) {
+      var point = geometries[0];
+      layout = point.getLayout();
+      flatCoordinates = point.getFlatCoordinates();
+
+      for (var i$1 = 1, ii$1 = geometries.length; i$1 < ii$1; ++i$1) {
+        geometry = geometries[i$1];
+        (0, _array.extend)(flatCoordinates, geometry.getFlatCoordinates());
+      }
+
+      multiGeometry = new _MultiPoint.default(flatCoordinates, layout);
+      setCommonGeometryProperties(multiGeometry, geometries);
+    } else if (type == _GeometryType.default.LINE_STRING) {
+      multiGeometry = new _MultiLineString.default(geometries);
+      setCommonGeometryProperties(multiGeometry, geometries);
+    } else if (type == _GeometryType.default.POLYGON) {
+      multiGeometry = new _MultiPolygon.default(geometries);
+      setCommonGeometryProperties(multiGeometry, geometries);
+    } else if (type == _GeometryType.default.GEOMETRY_COLLECTION) {
+      multiGeometry = new _GeometryCollection.default(geometries);
+    } else {
+      (0, _asserts.assert)(false, 37); // Unknown geometry type found
+    }
+  } else {
+    multiGeometry = new _GeometryCollection.default(geometries);
+  }
+
+  return (
+    /** @type {import("../geom/Geometry.js").default} */
+    multiGeometry
+  );
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Point|undefined} Point.
+ */
+
+
+function readPoint(node, objectStack) {
+  var properties = (0, _xml.pushParseAndPop)({}, EXTRUDE_AND_ALTITUDE_MODE_PARSERS, node, objectStack);
+  var flatCoordinates = readFlatCoordinatesFromNode(node, objectStack);
+
+  if (flatCoordinates) {
+    var point = new _Point.default(flatCoordinates, _GeometryLayout.default.XYZ);
+    point.setProperties(properties);
+    return point;
+  } else {
+    return undefined;
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var FLAT_LINEAR_RINGS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'innerBoundaryIs': innerBoundaryIsParser,
+  'outerBoundaryIs': outerBoundaryIsParser
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Polygon|undefined} Polygon.
+ */
+
+function readPolygon(node, objectStack) {
+  var properties = (0, _xml.pushParseAndPop)(
+  /** @type {Object<string,*>} */
+  {}, EXTRUDE_AND_ALTITUDE_MODE_PARSERS, node, objectStack);
+  var flatLinearRings = (0, _xml.pushParseAndPop)([null], FLAT_LINEAR_RINGS_PARSERS, node, objectStack);
+
+  if (flatLinearRings && flatLinearRings[0]) {
+    var flatCoordinates = flatLinearRings[0];
+    var ends = [flatCoordinates.length];
+
+    for (var i = 1, ii = flatLinearRings.length; i < ii; ++i) {
+      (0, _array.extend)(flatCoordinates, flatLinearRings[i]);
+      ends.push(flatCoordinates.length);
+    }
+
+    var polygon = new _Polygon.default(flatCoordinates, _GeometryLayout.default.XYZ, ends);
+    polygon.setProperties(properties);
+    return polygon;
+  } else {
+    return undefined;
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var STYLE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'IconStyle': iconStyleParser,
+  'LabelStyle': labelStyleParser,
+  'LineStyle': lineStyleParser,
+  'PolyStyle': polyStyleParser
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Array<Style>} Style.
+ */
+
+function readStyle(node, objectStack) {
+  var styleObject = (0, _xml.pushParseAndPop)({}, STYLE_PARSERS, node, objectStack);
+
+  if (!styleObject) {
+    return null;
+  }
+
+  var fillStyle =
+  /** @type {Fill} */
+  'fillStyle' in styleObject ? styleObject['fillStyle'] : DEFAULT_FILL_STYLE;
+  var fill =
+  /** @type {boolean|undefined} */
+  styleObject['fill'];
+
+  if (fill !== undefined && !fill) {
+    fillStyle = null;
+  }
+
+  var imageStyle;
+
+  if ('imageStyle' in styleObject) {
+    if (styleObject['imageStyle'] != DEFAULT_NO_IMAGE_STYLE) {
+      imageStyle = styleObject['imageStyle'];
+    }
+  } else {
+    imageStyle = DEFAULT_IMAGE_STYLE;
+  }
+
+  var textStyle =
+  /** @type {Text} */
+  'textStyle' in styleObject ? styleObject['textStyle'] : DEFAULT_TEXT_STYLE;
+  var strokeStyle =
+  /** @type {Stroke} */
+  'strokeStyle' in styleObject ? styleObject['strokeStyle'] : DEFAULT_STROKE_STYLE;
+  var outline =
+  /** @type {boolean|undefined} */
+  styleObject['outline'];
+
+  if (outline !== undefined && !outline) {
+    strokeStyle = null;
+  }
+
+  return [new _Style.default({
+    fill: fillStyle,
+    image: imageStyle,
+    stroke: strokeStyle,
+    text: textStyle,
+    zIndex: undefined // FIXME
+
+  })];
+}
+/**
+ * Reads an array of geometries and creates arrays for common geometry
+ * properties. Then sets them to the multi geometry.
+ * @param {MultiPoint|MultiLineString|MultiPolygon} multiGeometry A multi-geometry.
+ * @param {Array<import("../geom/Geometry.js").default>} geometries List of geometries.
+ */
+
+
+function setCommonGeometryProperties(multiGeometry, geometries) {
+  var ii = geometries.length;
+  var extrudes = new Array(geometries.length);
+  var tessellates = new Array(geometries.length);
+  var altitudeModes = new Array(geometries.length);
+  var hasExtrude, hasTessellate, hasAltitudeMode;
+  hasExtrude = hasTessellate = hasAltitudeMode = false;
+
+  for (var i = 0; i < ii; ++i) {
+    var geometry = geometries[i];
+    extrudes[i] = geometry.get('extrude');
+    tessellates[i] = geometry.get('tessellate');
+    altitudeModes[i] = geometry.get('altitudeMode');
+    hasExtrude = hasExtrude || extrudes[i] !== undefined;
+    hasTessellate = hasTessellate || tessellates[i] !== undefined;
+    hasAltitudeMode = hasAltitudeMode || altitudeModes[i];
+  }
+
+  if (hasExtrude) {
+    multiGeometry.set('extrude', extrudes);
+  }
+
+  if (hasTessellate) {
+    multiGeometry.set('tessellate', tessellates);
+  }
+
+  if (hasAltitudeMode) {
+    multiGeometry.set('altitudeMode', altitudeModes);
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var DATA_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'displayName': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'value': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function dataParser(node, objectStack) {
+  var name = node.getAttribute('name');
+  (0, _xml.parseNode)(DATA_PARSERS, node, objectStack);
+  var featureObject =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+
+  if (name !== null) {
+    featureObject[name] = featureObject.value;
+  } else if (featureObject.displayName !== null) {
+    featureObject[featureObject.displayName] = featureObject.value;
+  }
+
+  delete featureObject['value'];
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var EXTENDED_DATA_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Data': dataParser,
+  'SchemaData': schemaDataParser
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function extendedDataParser(node, objectStack) {
+  (0, _xml.parseNode)(EXTENDED_DATA_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function regionParser(node, objectStack) {
+  (0, _xml.parseNode)(REGION_PARSERS, node, objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var PAIR_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Style': (0, _xml.makeObjectPropertySetter)(readStyle),
+  'key': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'styleUrl': (0, _xml.makeObjectPropertySetter)(readURI)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function pairDataParser(node, objectStack) {
+  var pairObject = (0, _xml.pushParseAndPop)({}, PAIR_PARSERS, node, objectStack);
+
+  if (!pairObject) {
+    return;
+  }
+
+  var key =
+  /** @type {string|undefined} */
+  pairObject['key'];
+
+  if (key && key == 'normal') {
+    var styleUrl =
+    /** @type {string|undefined} */
+    pairObject['styleUrl'];
+
+    if (styleUrl) {
+      objectStack[objectStack.length - 1] = styleUrl;
+    }
+
+    var style =
+    /** @type {Style} */
+    pairObject['Style'];
+
+    if (style) {
+      objectStack[objectStack.length - 1] = style;
+    }
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function placemarkStyleMapParser(node, objectStack) {
+  var styleMapValue = readStyleMapValue(node, objectStack);
+
+  if (!styleMapValue) {
+    return;
+  }
+
+  var placemarkObject = objectStack[objectStack.length - 1];
+
+  if (Array.isArray(styleMapValue)) {
+    placemarkObject['Style'] = styleMapValue;
+  } else if (typeof styleMapValue === 'string') {
+    placemarkObject['styleUrl'] = styleMapValue;
+  } else {
+    (0, _asserts.assert)(false, 38); // `styleMapValue` has an unknown type
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var SCHEMA_DATA_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'SimpleData': simpleDataParser
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function schemaDataParser(node, objectStack) {
+  (0, _xml.parseNode)(SCHEMA_DATA_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function simpleDataParser(node, objectStack) {
+  var name = node.getAttribute('name');
+
+  if (name !== null) {
+    var data = (0, _xsd.readString)(node);
+    var featureObject =
+    /** @type {Object} */
+    objectStack[objectStack.length - 1];
+    featureObject[name] = data;
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var LAT_LON_ALT_BOX_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'altitudeMode': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'minAltitude': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'maxAltitude': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'north': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'south': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'east': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'west': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function latLonAltBoxParser(node, objectStack) {
+  var object = (0, _xml.pushParseAndPop)({}, LAT_LON_ALT_BOX_PARSERS, node, objectStack);
+
+  if (!object) {
+    return;
+  }
+
+  var regionObject =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  var extent = [parseFloat(object['west']), parseFloat(object['south']), parseFloat(object['east']), parseFloat(object['north'])];
+  regionObject['extent'] = extent;
+  regionObject['altitudeMode'] = object['altitudeMode'];
+  regionObject['minAltitude'] = parseFloat(object['minAltitude']);
+  regionObject['maxAltitude'] = parseFloat(object['maxAltitude']);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var LOD_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'minLodPixels': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'maxLodPixels': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'minFadeExtent': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'maxFadeExtent': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function lodParser(node, objectStack) {
+  var object = (0, _xml.pushParseAndPop)({}, LOD_PARSERS, node, objectStack);
+
+  if (!object) {
+    return;
+  }
+
+  var lodObject =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  lodObject['minLodPixels'] = parseFloat(object['minLodPixels']);
+  lodObject['maxLodPixels'] = parseFloat(object['maxLodPixels']);
+  lodObject['minFadeExtent'] = parseFloat(object['minFadeExtent']);
+  lodObject['maxFadeExtent'] = parseFloat(object['maxFadeExtent']);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var INNER_BOUNDARY_IS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'LinearRing': (0, _xml.makeReplacer)(readFlatLinearRing)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function innerBoundaryIsParser(node, objectStack) {
+  /** @type {Array<number>|undefined} */
+  var flatLinearRing = (0, _xml.pushParseAndPop)(undefined, INNER_BOUNDARY_IS_PARSERS, node, objectStack);
+
+  if (flatLinearRing) {
+    var flatLinearRings =
+    /** @type {Array<Array<number>>} */
+    objectStack[objectStack.length - 1];
+    flatLinearRings.push(flatLinearRing);
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var OUTER_BOUNDARY_IS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'LinearRing': (0, _xml.makeReplacer)(readFlatLinearRing)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function outerBoundaryIsParser(node, objectStack) {
+  /** @type {Array<number>|undefined} */
+  var flatLinearRing = (0, _xml.pushParseAndPop)(undefined, OUTER_BOUNDARY_IS_PARSERS, node, objectStack);
+
+  if (flatLinearRing) {
+    var flatLinearRings =
+    /** @type {Array<Array<number>>} */
+    objectStack[objectStack.length - 1];
+    flatLinearRings[0] = flatLinearRing;
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function linkParser(node, objectStack) {
+  (0, _xml.parseNode)(LINK_PARSERS, node, objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function whenParser(node, objectStack) {
+  var gxTrackObject =
+  /** @type {GxTrackObject} */
+  objectStack[objectStack.length - 1];
+  var whens = gxTrackObject.whens;
+  var s = (0, _xml.getAllTextContent)(node, false);
+  var when = Date.parse(s);
+  whens.push(isNaN(when) ? 0 : when);
+}
+/**
+ * @param {Node} node Node to append a TextNode with the color to.
+ * @param {import("../color.js").Color|string} color Color.
+ */
+
+
+function writeColorTextNode(node, color) {
+  var rgba = (0, _color.asArray)(color);
+  var opacity = rgba.length == 4 ? rgba[3] : 1;
+  /** @type {Array<string|number>} */
+
+  var abgr = [opacity * 255, rgba[2], rgba[1], rgba[0]];
+
+  for (var i = 0; i < 4; ++i) {
+    var hex = Math.floor(
+    /** @type {number} */
+    abgr[i]).toString(16);
+    abgr[i] = hex.length == 1 ? '0' + hex : hex;
+  }
+
+  (0, _xsd.writeStringTextNode)(node, abgr.join(''));
+}
+/**
+ * @param {Node} node Node to append a TextNode with the coordinates to.
+ * @param {Array<number>} coordinates Coordinates.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function writeCoordinatesTextNode(node, coordinates, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  var layout = context['layout'];
+  var stride = context['stride'];
+  var dimension;
+
+  if (layout == _GeometryLayout.default.XY || layout == _GeometryLayout.default.XYM) {
+    dimension = 2;
+  } else if (layout == _GeometryLayout.default.XYZ || layout == _GeometryLayout.default.XYZM) {
+    dimension = 3;
+  } else {
+    (0, _asserts.assert)(false, 34); // Invalid geometry layout
+  }
+
+  var ii = coordinates.length;
+  var text = '';
+
+  if (ii > 0) {
+    text += coordinates[0];
+
+    for (var d = 1; d < dimension; ++d) {
+      text += ',' + coordinates[d];
+    }
+
+    for (var i = stride; i < ii; i += stride) {
+      text += ' ' + coordinates[i];
+
+      for (var d$1 = 1; d$1 < dimension; ++d$1) {
+        text += ',' + coordinates[i + d$1];
+      }
+    }
+  }
+
+  (0, _xsd.writeStringTextNode)(node, text);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+
+var EXTENDEDDATA_NODE_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Data': (0, _xml.makeChildAppender)(writeDataNode),
+  'value': (0, _xml.makeChildAppender)(writeDataNodeValue),
+  'displayName': (0, _xml.makeChildAppender)(writeDataNodeName)
+});
+/**
+ * @param {Element} node Node.
+ * @param {{name: *, value: *}} pair Name value pair.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writeDataNode(node, pair, objectStack) {
+  node.setAttribute('name', pair.name);
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  var value = pair.value;
+
+  if (typeof value == 'object') {
+    if (value !== null && value.displayName) {
+      (0, _xml.pushSerializeAndPop)(context, EXTENDEDDATA_NODE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, [value.displayName], objectStack, ['displayName']);
+    }
+
+    if (value !== null && value.value) {
+      (0, _xml.pushSerializeAndPop)(context, EXTENDEDDATA_NODE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, [value.value], objectStack, ['value']);
+    }
+  } else {
+    (0, _xml.pushSerializeAndPop)(context, EXTENDEDDATA_NODE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, [value], objectStack, ['value']);
+  }
+}
+/**
+ * @param {Node} node Node to append a TextNode with the name to.
+ * @param {string} name DisplayName.
+ */
+
+
+function writeDataNodeName(node, name) {
+  (0, _xsd.writeCDATASection)(node, name);
+}
+/**
+ * @param {Node} node Node to append a CDATA Section with the value to.
+ * @param {string} value Value.
+ */
+
+
+function writeDataNodeValue(node, value) {
+  (0, _xsd.writeStringTextNode)(node, value);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+
+var DOCUMENT_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Placemark': (0, _xml.makeChildAppender)(writePlacemark)
+});
+/**
+ * @const
+ * @param {*} value Value.
+ * @param {Array<*>} objectStack Object stack.
+ * @param {string=} opt_nodeName Node name.
+ * @return {Node|undefined} Node.
+ */
+
+var DOCUMENT_NODE_FACTORY = function (value, objectStack, opt_nodeName) {
+  var parentNode = objectStack[objectStack.length - 1].node;
+  return (0, _xml.createElementNS)(parentNode.namespaceURI, 'Placemark');
+};
+/**
+ * @param {Node} node Node.
+ * @param {Array<Feature>} features Features.
+ * @param {Array<*>} objectStack Object stack.
+ * @this {KML}
+ */
+
+
+function writeDocument(node, features, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  (0, _xml.pushSerializeAndPop)(context, DOCUMENT_SERIALIZERS, DOCUMENT_NODE_FACTORY, features, objectStack, undefined, this);
+}
+/**
+ * A factory for creating Data nodes.
+ * @const
+ * @type {function(*, Array<*>): (Node|undefined)}
+ */
+
+
+var DATA_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('Data');
+/**
+ * @param {Node} node Node.
+ * @param {{names: Array<string>, values: (Array<*>)}} namesAndValues Names and values.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writeExtendedData(node, namesAndValues, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  var names = namesAndValues.names;
+  var values = namesAndValues.values;
+  var length = names.length;
+
+  for (var i = 0; i < length; i++) {
+    (0, _xml.pushSerializeAndPop)(context, EXTENDEDDATA_NODE_SERIALIZERS, DATA_NODE_FACTORY, [{
+      name: names[i],
+      value: values[i]
+    }], objectStack);
+  }
+}
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+
+var ICON_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['href'], (0, _xml.makeStructureNS)(GX_NAMESPACE_URIS, ['x', 'y', 'w', 'h']));
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var ICON_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'href': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode)
+}, (0, _xml.makeStructureNS)(GX_NAMESPACE_URIS, {
+  'x': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'y': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'w': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'h': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode)
+}));
+/**
+ * @const
+ * @param {*} value Value.
+ * @param {Array<*>} objectStack Object stack.
+ * @param {string=} opt_nodeName Node name.
+ * @return {Node|undefined} Node.
+ */
+
+var GX_NODE_FACTORY = function (value, objectStack, opt_nodeName) {
+  return (0, _xml.createElementNS)(GX_NAMESPACE_URIS[0], 'gx:' + opt_nodeName);
+};
+/**
+ * @param {Node} node Node.
+ * @param {Object} icon Icon object.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+
+function writeIcon(node, icon, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = ICON_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(icon, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, ICON_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+  orderedKeys = ICON_SEQUENCE[GX_NAMESPACE_URIS[0]];
+  values = (0, _xml.makeSequence)(icon, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, ICON_SERIALIZERS, GX_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+
+var ICON_STYLE_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['scale', 'heading', 'Icon', 'hotSpot']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var ICON_STYLE_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Icon': (0, _xml.makeChildAppender)(writeIcon),
+  'heading': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode),
+  'hotSpot': (0, _xml.makeChildAppender)(writeVec2),
+  'scale': (0, _xml.makeChildAppender)(writeScaleTextNode)
+});
+/**
+ * @param {Node} node Node.
+ * @param {import("../style/Icon.js").default} style Icon style.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writeIconStyle(node, style, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  var properties = {};
+  var src = style.getSrc();
+  var size = style.getSize();
+  var iconImageSize = style.getImageSize();
+  var iconProperties = {
+    'href': src
+  };
+
+  if (size) {
+    iconProperties['w'] = size[0];
+    iconProperties['h'] = size[1];
+    var anchor = style.getAnchor(); // top-left
+
+    var origin = style.getOrigin(); // top-left
+
+    if (origin && iconImageSize && origin[0] !== 0 && origin[1] !== size[1]) {
+      iconProperties['x'] = origin[0];
+      iconProperties['y'] = iconImageSize[1] - (origin[1] + size[1]);
+    }
+
+    if (anchor && (anchor[0] !== size[0] / 2 || anchor[1] !== size[1] / 2)) {
+      var
+      /** @type {Vec2} */
+      hotSpot = {
+        x: anchor[0],
+        xunits: _IconAnchorUnits.default.PIXELS,
+        y: size[1] - anchor[1],
+        yunits: _IconAnchorUnits.default.PIXELS
+      };
+      properties['hotSpot'] = hotSpot;
+    }
+  }
+
+  properties['Icon'] = iconProperties;
+  var scale = style.getScale();
+
+  if (scale !== 1) {
+    properties['scale'] = scale;
+  }
+
+  var rotation = style.getRotation();
+
+  if (rotation !== 0) {
+    properties['heading'] = rotation; // 0-360
+  }
+
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = ICON_STYLE_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, ICON_STYLE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+
+var LABEL_STYLE_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['color', 'scale']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var LABEL_STYLE_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'color': (0, _xml.makeChildAppender)(writeColorTextNode),
+  'scale': (0, _xml.makeChildAppender)(writeScaleTextNode)
+});
+/**
+ * @param {Node} node Node.
+ * @param {Text} style style.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writeLabelStyle(node, style, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  var properties = {};
+  var fill = style.getFill();
+
+  if (fill) {
+    properties['color'] = fill.getColor();
+  }
+
+  var scale = style.getScale();
+
+  if (scale && scale !== 1) {
+    properties['scale'] = scale;
+  }
+
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = LABEL_STYLE_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, LABEL_STYLE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+
+var LINE_STYLE_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['color', 'width']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var LINE_STYLE_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'color': (0, _xml.makeChildAppender)(writeColorTextNode),
+  'width': (0, _xml.makeChildAppender)(_xsd.writeDecimalTextNode)
+});
+/**
+ * @param {Node} node Node.
+ * @param {Stroke} style style.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writeLineStyle(node, style, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  var properties = {
+    'color': style.getColor(),
+    'width': style.getWidth()
+  };
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = LINE_STYLE_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, LINE_STYLE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @const
+ * @type {Object<string, string>}
+ */
+
+
+var GEOMETRY_TYPE_TO_NODENAME = {
+  'Point': 'Point',
+  'LineString': 'LineString',
+  'LinearRing': 'LinearRing',
+  'Polygon': 'Polygon',
+  'MultiPoint': 'MultiGeometry',
+  'MultiLineString': 'MultiGeometry',
+  'MultiPolygon': 'MultiGeometry',
+  'GeometryCollection': 'MultiGeometry'
+};
+/**
+ * @const
+ * @param {*} value Value.
+ * @param {Array<*>} objectStack Object stack.
+ * @param {string=} opt_nodeName Node name.
+ * @return {Node|undefined} Node.
+ */
+
+var GEOMETRY_NODE_FACTORY = function (value, objectStack, opt_nodeName) {
+  if (value) {
+    var parentNode = objectStack[objectStack.length - 1].node;
+    return (0, _xml.createElementNS)(parentNode.namespaceURI, GEOMETRY_TYPE_TO_NODENAME[
+    /** @type {import("../geom/Geometry.js").default} */
+    value.getType()]);
+  }
+};
+/**
+ * A factory for creating Point nodes.
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+
+var POINT_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('Point');
+/**
+ * A factory for creating LineString nodes.
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+var LINE_STRING_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('LineString');
+/**
+ * A factory for creating LinearRing nodes.
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+var LINEAR_RING_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('LinearRing');
+/**
+ * A factory for creating Polygon nodes.
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+var POLYGON_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('Polygon');
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var MULTI_GEOMETRY_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'LineString': (0, _xml.makeChildAppender)(writePrimitiveGeometry),
+  'Point': (0, _xml.makeChildAppender)(writePrimitiveGeometry),
+  'Polygon': (0, _xml.makeChildAppender)(writePolygon),
+  'GeometryCollection': (0, _xml.makeChildAppender)(writeMultiGeometry)
+});
+/**
+ * @param {Node} node Node.
+ * @param {import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writeMultiGeometry(node, geometry, objectStack) {
+  /** @type {import("../xml.js").NodeStackItem} */
+  var context = {
+    node: node
+  };
+  var type = geometry.getType();
+  /** @type {Array<import("../geom/Geometry.js").default>} */
+
+  var geometries;
+  /** @type {function(*, Array<*>, string=): (Node|undefined)} */
+
+  var factory;
+
+  if (type == _GeometryType.default.GEOMETRY_COLLECTION) {
+    geometries =
+    /** @type {GeometryCollection} */
+    geometry.getGeometries();
+    factory = GEOMETRY_NODE_FACTORY;
+  } else if (type == _GeometryType.default.MULTI_POINT) {
+    geometries =
+    /** @type {MultiPoint} */
+    geometry.getPoints();
+    factory = POINT_NODE_FACTORY;
+  } else if (type == _GeometryType.default.MULTI_LINE_STRING) {
+    geometries =
+    /** @type {MultiLineString} */
+    geometry.getLineStrings();
+    factory = LINE_STRING_NODE_FACTORY;
+  } else if (type == _GeometryType.default.MULTI_POLYGON) {
+    geometries =
+    /** @type {MultiPolygon} */
+    geometry.getPolygons();
+    factory = POLYGON_NODE_FACTORY;
+  } else {
+    (0, _asserts.assert)(false, 39); // Unknown geometry type
+  }
+
+  (0, _xml.pushSerializeAndPop)(context, MULTI_GEOMETRY_SERIALIZERS, factory, geometries, objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+
+var BOUNDARY_IS_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'LinearRing': (0, _xml.makeChildAppender)(writePrimitiveGeometry)
+});
+/**
+ * @param {Node} node Node.
+ * @param {import("../geom/LinearRing.js").default} linearRing Linear ring.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writeBoundaryIs(node, linearRing, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  (0, _xml.pushSerializeAndPop)(context, BOUNDARY_IS_SERIALIZERS, LINEAR_RING_NODE_FACTORY, [linearRing], objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+
+var PLACEMARK_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ExtendedData': (0, _xml.makeChildAppender)(writeExtendedData),
+  'MultiGeometry': (0, _xml.makeChildAppender)(writeMultiGeometry),
+  'LineString': (0, _xml.makeChildAppender)(writePrimitiveGeometry),
+  'LinearRing': (0, _xml.makeChildAppender)(writePrimitiveGeometry),
+  'Point': (0, _xml.makeChildAppender)(writePrimitiveGeometry),
+  'Polygon': (0, _xml.makeChildAppender)(writePolygon),
+  'Style': (0, _xml.makeChildAppender)(writeStyle),
+  'address': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'description': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'name': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'open': (0, _xml.makeChildAppender)(_xsd.writeBooleanTextNode),
+  'phoneNumber': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'styleUrl': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'visibility': (0, _xml.makeChildAppender)(_xsd.writeBooleanTextNode)
+});
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+var PLACEMARK_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['name', 'open', 'visibility', 'address', 'phoneNumber', 'description', 'styleUrl', 'Style']);
+/**
+ * A factory for creating ExtendedData nodes.
+ * @const
+ * @type {function(*, Array<*>): (Node|undefined)}
+ */
+
+var EXTENDEDDATA_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('ExtendedData');
+/**
+ * FIXME currently we do serialize arbitrary/custom feature properties
+ * (ExtendedData).
+ * @param {Element} node Node.
+ * @param {Feature} feature Feature.
+ * @param {Array<*>} objectStack Object stack.
+ * @this {KML}
+ */
+
+function writePlacemark(node, feature, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  }; // set id
+
+  if (feature.getId()) {
+    node.setAttribute('id',
+    /** @type {string} */
+    feature.getId());
+  } // serialize properties (properties unknown to KML are not serialized)
+
+
+  var properties = feature.getProperties(); // don't export these to ExtendedData
+
+  var filter = {
+    'address': 1,
+    'description': 1,
+    'name': 1,
+    'open': 1,
+    'phoneNumber': 1,
+    'styleUrl': 1,
+    'visibility': 1
+  };
+  filter[feature.getGeometryName()] = 1;
+  var keys = Object.keys(properties || {}).sort().filter(function (v) {
+    return !filter[v];
+  });
+
+  if (keys.length > 0) {
+    var sequence = (0, _xml.makeSequence)(properties, keys);
+    var namesAndValues = {
+      names: keys,
+      values: sequence
+    };
+    (0, _xml.pushSerializeAndPop)(context, PLACEMARK_SERIALIZERS, EXTENDEDDATA_NODE_FACTORY, [namesAndValues], objectStack);
+  }
+
+  var styleFunction = feature.getStyleFunction();
+
+  if (styleFunction) {
+    // FIXME the styles returned by the style function are supposed to be
+    // resolution-independent here
+    var styles = styleFunction(feature, 0);
+
+    if (styles) {
+      var style = Array.isArray(styles) ? styles[0] : styles;
+
+      if (this.writeStyles_) {
+        properties['Style'] = style;
+      }
+
+      var textStyle = style.getText();
+
+      if (textStyle) {
+        properties['name'] = textStyle.getText();
+      }
+    }
+  }
+
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = PLACEMARK_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, PLACEMARK_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys); // serialize geometry
+
+  var options =
+  /** @type {import("./Feature.js").WriteOptions} */
+  objectStack[0];
+  var geometry = feature.getGeometry();
+
+  if (geometry) {
+    geometry =
+    /** @type {import("../geom/Geometry.js").default} */
+    (0, _Feature2.transformWithOptions)(geometry, true, options);
+  }
+
+  (0, _xml.pushSerializeAndPop)(context, PLACEMARK_SERIALIZERS, GEOMETRY_NODE_FACTORY, [geometry], objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+
+var PRIMITIVE_GEOMETRY_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['extrude', 'tessellate', 'altitudeMode', 'coordinates']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var PRIMITIVE_GEOMETRY_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'extrude': (0, _xml.makeChildAppender)(_xsd.writeBooleanTextNode),
+  'tessellate': (0, _xml.makeChildAppender)(_xsd.writeBooleanTextNode),
+  'altitudeMode': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+  'coordinates': (0, _xml.makeChildAppender)(writeCoordinatesTextNode)
+});
+/**
+ * @param {Node} node Node.
+ * @param {import("../geom/SimpleGeometry.js").default} geometry Geometry.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writePrimitiveGeometry(node, geometry, objectStack) {
+  var flatCoordinates = geometry.getFlatCoordinates();
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  context['layout'] = geometry.getLayout();
+  context['stride'] = geometry.getStride(); // serialize properties (properties unknown to KML are not serialized)
+
+  var properties = geometry.getProperties();
+  properties.coordinates = flatCoordinates;
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = PRIMITIVE_GEOMETRY_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, PRIMITIVE_GEOMETRY_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+
+var POLYGON_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'outerBoundaryIs': (0, _xml.makeChildAppender)(writeBoundaryIs),
+  'innerBoundaryIs': (0, _xml.makeChildAppender)(writeBoundaryIs)
+});
+/**
+ * A factory for creating innerBoundaryIs nodes.
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+var INNER_BOUNDARY_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('innerBoundaryIs');
+/**
+ * A factory for creating outerBoundaryIs nodes.
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+var OUTER_BOUNDARY_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('outerBoundaryIs');
+/**
+ * @param {Node} node Node.
+ * @param {Polygon} polygon Polygon.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writePolygon(node, polygon, objectStack) {
+  var linearRings = polygon.getLinearRings();
+  var outerRing = linearRings.shift();
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  }; // inner rings
+
+  (0, _xml.pushSerializeAndPop)(context, POLYGON_SERIALIZERS, INNER_BOUNDARY_NODE_FACTORY, linearRings, objectStack); // outer ring
+
+  (0, _xml.pushSerializeAndPop)(context, POLYGON_SERIALIZERS, OUTER_BOUNDARY_NODE_FACTORY, [outerRing], objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+
+var POLY_STYLE_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'color': (0, _xml.makeChildAppender)(writeColorTextNode)
+});
+/**
+ * A factory for creating coordinates nodes.
+ * @const
+ * @type {function(*, Array<*>, string=): (Node|undefined)}
+ */
+
+var COLOR_NODE_FACTORY = (0, _xml.makeSimpleNodeFactory)('color');
+/**
+ * @param {Node} node Node.
+ * @param {Fill} style Style.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writePolyStyle(node, style, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  (0, _xml.pushSerializeAndPop)(context, POLY_STYLE_SERIALIZERS, COLOR_NODE_FACTORY, [style.getColor()], objectStack);
+}
+/**
+ * @param {Node} node Node to append a TextNode with the scale to.
+ * @param {number|undefined} scale Scale.
+ */
+
+
+function writeScaleTextNode(node, scale) {
+  // the Math is to remove any excess decimals created by float arithmetic
+  (0, _xsd.writeDecimalTextNode)(node, Math.round(scale * 1e6) / 1e6);
+}
+/**
+ * @const
+ * @type {Object<string, Array<string>>}
+ */
+
+
+var STYLE_SEQUENCE = (0, _xml.makeStructureNS)(NAMESPACE_URIS, ['IconStyle', 'LabelStyle', 'LineStyle', 'PolyStyle']);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var STYLE_SERIALIZERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'IconStyle': (0, _xml.makeChildAppender)(writeIconStyle),
+  'LabelStyle': (0, _xml.makeChildAppender)(writeLabelStyle),
+  'LineStyle': (0, _xml.makeChildAppender)(writeLineStyle),
+  'PolyStyle': (0, _xml.makeChildAppender)(writePolyStyle)
+});
+/**
+ * @param {Node} node Node.
+ * @param {Style} style Style.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function writeStyle(node, style, objectStack) {
+  var
+  /** @type {import("../xml.js").NodeStackItem} */
+  context = {
+    node: node
+  };
+  var properties = {};
+  var fillStyle = style.getFill();
+  var strokeStyle = style.getStroke();
+  var imageStyle = style.getImage();
+  var textStyle = style.getText();
+
+  if (imageStyle && typeof
+  /** @type {?} */
+  imageStyle.getSrc === 'function') {
+    properties['IconStyle'] = imageStyle;
+  }
+
+  if (textStyle) {
+    properties['LabelStyle'] = textStyle;
+  }
+
+  if (strokeStyle) {
+    properties['LineStyle'] = strokeStyle;
+  }
+
+  if (fillStyle) {
+    properties['PolyStyle'] = fillStyle;
+  }
+
+  var parentNode = objectStack[objectStack.length - 1].node;
+  var orderedKeys = STYLE_SEQUENCE[parentNode.namespaceURI];
+  var values = (0, _xml.makeSequence)(properties, orderedKeys);
+  (0, _xml.pushSerializeAndPop)(context, STYLE_SERIALIZERS, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, orderedKeys);
+}
+/**
+ * @param {Element} node Node to append a TextNode with the Vec2 to.
+ * @param {Vec2} vec2 Vec2.
+ */
+
+
+function writeVec2(node, vec2) {
+  node.setAttribute('x', String(vec2.x));
+  node.setAttribute('y', String(vec2.y));
+  node.setAttribute('xunits', vec2.xunits);
+  node.setAttribute('yunits', vec2.yunits);
+}
+
+var _default = KML;
+exports.default = _default;
+},{"../Feature.js":"../node_modules/ol/Feature.js","../array.js":"../node_modules/ol/array.js","../asserts.js":"../node_modules/ol/asserts.js","../color.js":"../node_modules/ol/color.js","./Feature.js":"../node_modules/ol/format/Feature.js","./XMLFeature.js":"../node_modules/ol/format/XMLFeature.js","./xsd.js":"../node_modules/ol/format/xsd.js","../geom/GeometryCollection.js":"../node_modules/ol/geom/GeometryCollection.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/GeometryType.js":"../node_modules/ol/geom/GeometryType.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/MultiPoint.js":"../node_modules/ol/geom/MultiPoint.js","../geom/MultiPolygon.js":"../node_modules/ol/geom/MultiPolygon.js","../geom/Point.js":"../node_modules/ol/geom/Point.js","../geom/Polygon.js":"../node_modules/ol/geom/Polygon.js","../math.js":"../node_modules/ol/math.js","../proj.js":"../node_modules/ol/proj.js","../style/Fill.js":"../node_modules/ol/style/Fill.js","../style/Icon.js":"../node_modules/ol/style/Icon.js","../style/IconAnchorUnits.js":"../node_modules/ol/style/IconAnchorUnits.js","../style/IconOrigin.js":"../node_modules/ol/style/IconOrigin.js","../style/Stroke.js":"../node_modules/ol/style/Stroke.js","../style/Style.js":"../node_modules/ol/style/Style.js","../style/Text.js":"../node_modules/ol/style/Text.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ieee754/index.js":[function(require,module,exports) {
+exports.read = function (buffer, offset, isLE, mLen, nBytes) {
+  var e, m
+  var eLen = (nBytes * 8) - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var nBits = -7
+  var i = isLE ? (nBytes - 1) : 0
+  var d = isLE ? -1 : 1
+  var s = buffer[offset + i]
+
+  i += d
+
+  e = s & ((1 << (-nBits)) - 1)
+  s >>= (-nBits)
+  nBits += eLen
+  for (; nBits > 0; e = (e * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+
+  m = e & ((1 << (-nBits)) - 1)
+  e >>= (-nBits)
+  nBits += mLen
+  for (; nBits > 0; m = (m * 256) + buffer[offset + i], i += d, nBits -= 8) {}
+
+  if (e === 0) {
+    e = 1 - eBias
+  } else if (e === eMax) {
+    return m ? NaN : ((s ? -1 : 1) * Infinity)
+  } else {
+    m = m + Math.pow(2, mLen)
+    e = e - eBias
+  }
+  return (s ? -1 : 1) * m * Math.pow(2, e - mLen)
+}
+
+exports.write = function (buffer, value, offset, isLE, mLen, nBytes) {
+  var e, m, c
+  var eLen = (nBytes * 8) - mLen - 1
+  var eMax = (1 << eLen) - 1
+  var eBias = eMax >> 1
+  var rt = (mLen === 23 ? Math.pow(2, -24) - Math.pow(2, -77) : 0)
+  var i = isLE ? 0 : (nBytes - 1)
+  var d = isLE ? 1 : -1
+  var s = value < 0 || (value === 0 && 1 / value < 0) ? 1 : 0
+
+  value = Math.abs(value)
+
+  if (isNaN(value) || value === Infinity) {
+    m = isNaN(value) ? 1 : 0
+    e = eMax
+  } else {
+    e = Math.floor(Math.log(value) / Math.LN2)
+    if (value * (c = Math.pow(2, -e)) < 1) {
+      e--
+      c *= 2
+    }
+    if (e + eBias >= 1) {
+      value += rt / c
+    } else {
+      value += rt * Math.pow(2, 1 - eBias)
+    }
+    if (value * c >= 2) {
+      e++
+      c /= 2
+    }
+
+    if (e + eBias >= eMax) {
+      m = 0
+      e = eMax
+    } else if (e + eBias >= 1) {
+      m = ((value * c) - 1) * Math.pow(2, mLen)
+      e = e + eBias
+    } else {
+      m = value * Math.pow(2, eBias - 1) * Math.pow(2, mLen)
+      e = 0
+    }
+  }
+
+  for (; mLen >= 8; buffer[offset + i] = m & 0xff, i += d, m /= 256, mLen -= 8) {}
+
+  e = (e << mLen) | m
+  eLen += mLen
+  for (; eLen > 0; buffer[offset + i] = e & 0xff, i += d, e /= 256, eLen -= 8) {}
+
+  buffer[offset + i - d] |= s * 128
+}
+
+},{}],"../node_modules/pbf/index.js":[function(require,module,exports) {
+'use strict';
+
+module.exports = Pbf;
+
+var ieee754 = require('ieee754');
+
+function Pbf(buf) {
+    this.buf = ArrayBuffer.isView && ArrayBuffer.isView(buf) ? buf : new Uint8Array(buf || 0);
+    this.pos = 0;
+    this.type = 0;
+    this.length = this.buf.length;
+}
+
+Pbf.Varint  = 0; // varint: int32, int64, uint32, uint64, sint32, sint64, bool, enum
+Pbf.Fixed64 = 1; // 64-bit: double, fixed64, sfixed64
+Pbf.Bytes   = 2; // length-delimited: string, bytes, embedded messages, packed repeated fields
+Pbf.Fixed32 = 5; // 32-bit: float, fixed32, sfixed32
+
+var SHIFT_LEFT_32 = (1 << 16) * (1 << 16),
+    SHIFT_RIGHT_32 = 1 / SHIFT_LEFT_32;
+
+Pbf.prototype = {
+
+    destroy: function() {
+        this.buf = null;
+    },
+
+    // === READING =================================================================
+
+    readFields: function(readField, result, end) {
+        end = end || this.length;
+
+        while (this.pos < end) {
+            var val = this.readVarint(),
+                tag = val >> 3,
+                startPos = this.pos;
+
+            this.type = val & 0x7;
+            readField(tag, result, this);
+
+            if (this.pos === startPos) this.skip(val);
+        }
+        return result;
+    },
+
+    readMessage: function(readField, result) {
+        return this.readFields(readField, result, this.readVarint() + this.pos);
+    },
+
+    readFixed32: function() {
+        var val = readUInt32(this.buf, this.pos);
+        this.pos += 4;
+        return val;
+    },
+
+    readSFixed32: function() {
+        var val = readInt32(this.buf, this.pos);
+        this.pos += 4;
+        return val;
+    },
+
+    // 64-bit int handling is based on github.com/dpw/node-buffer-more-ints (MIT-licensed)
+
+    readFixed64: function() {
+        var val = readUInt32(this.buf, this.pos) + readUInt32(this.buf, this.pos + 4) * SHIFT_LEFT_32;
+        this.pos += 8;
+        return val;
+    },
+
+    readSFixed64: function() {
+        var val = readUInt32(this.buf, this.pos) + readInt32(this.buf, this.pos + 4) * SHIFT_LEFT_32;
+        this.pos += 8;
+        return val;
+    },
+
+    readFloat: function() {
+        var val = ieee754.read(this.buf, this.pos, true, 23, 4);
+        this.pos += 4;
+        return val;
+    },
+
+    readDouble: function() {
+        var val = ieee754.read(this.buf, this.pos, true, 52, 8);
+        this.pos += 8;
+        return val;
+    },
+
+    readVarint: function(isSigned) {
+        var buf = this.buf,
+            val, b;
+
+        b = buf[this.pos++]; val  =  b & 0x7f;        if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 7;  if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 14; if (b < 0x80) return val;
+        b = buf[this.pos++]; val |= (b & 0x7f) << 21; if (b < 0x80) return val;
+        b = buf[this.pos];   val |= (b & 0x0f) << 28;
+
+        return readVarintRemainder(val, isSigned, this);
+    },
+
+    readVarint64: function() { // for compatibility with v2.0.1
+        return this.readVarint(true);
+    },
+
+    readSVarint: function() {
+        var num = this.readVarint();
+        return num % 2 === 1 ? (num + 1) / -2 : num / 2; // zigzag encoding
+    },
+
+    readBoolean: function() {
+        return Boolean(this.readVarint());
+    },
+
+    readString: function() {
+        var end = this.readVarint() + this.pos,
+            str = readUtf8(this.buf, this.pos, end);
+        this.pos = end;
+        return str;
+    },
+
+    readBytes: function() {
+        var end = this.readVarint() + this.pos,
+            buffer = this.buf.subarray(this.pos, end);
+        this.pos = end;
+        return buffer;
+    },
+
+    // verbose for performance reasons; doesn't affect gzipped size
+
+    readPackedVarint: function(arr, isSigned) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readVarint(isSigned));
+        return arr;
+    },
+    readPackedSVarint: function(arr) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readSVarint());
+        return arr;
+    },
+    readPackedBoolean: function(arr) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readBoolean());
+        return arr;
+    },
+    readPackedFloat: function(arr) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readFloat());
+        return arr;
+    },
+    readPackedDouble: function(arr) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readDouble());
+        return arr;
+    },
+    readPackedFixed32: function(arr) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readFixed32());
+        return arr;
+    },
+    readPackedSFixed32: function(arr) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readSFixed32());
+        return arr;
+    },
+    readPackedFixed64: function(arr) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readFixed64());
+        return arr;
+    },
+    readPackedSFixed64: function(arr) {
+        var end = readPackedEnd(this);
+        arr = arr || [];
+        while (this.pos < end) arr.push(this.readSFixed64());
+        return arr;
+    },
+
+    skip: function(val) {
+        var type = val & 0x7;
+        if (type === Pbf.Varint) while (this.buf[this.pos++] > 0x7f) {}
+        else if (type === Pbf.Bytes) this.pos = this.readVarint() + this.pos;
+        else if (type === Pbf.Fixed32) this.pos += 4;
+        else if (type === Pbf.Fixed64) this.pos += 8;
+        else throw new Error('Unimplemented type: ' + type);
+    },
+
+    // === WRITING =================================================================
+
+    writeTag: function(tag, type) {
+        this.writeVarint((tag << 3) | type);
+    },
+
+    realloc: function(min) {
+        var length = this.length || 16;
+
+        while (length < this.pos + min) length *= 2;
+
+        if (length !== this.length) {
+            var buf = new Uint8Array(length);
+            buf.set(this.buf);
+            this.buf = buf;
+            this.length = length;
+        }
+    },
+
+    finish: function() {
+        this.length = this.pos;
+        this.pos = 0;
+        return this.buf.subarray(0, this.length);
+    },
+
+    writeFixed32: function(val) {
+        this.realloc(4);
+        writeInt32(this.buf, val, this.pos);
+        this.pos += 4;
+    },
+
+    writeSFixed32: function(val) {
+        this.realloc(4);
+        writeInt32(this.buf, val, this.pos);
+        this.pos += 4;
+    },
+
+    writeFixed64: function(val) {
+        this.realloc(8);
+        writeInt32(this.buf, val & -1, this.pos);
+        writeInt32(this.buf, Math.floor(val * SHIFT_RIGHT_32), this.pos + 4);
+        this.pos += 8;
+    },
+
+    writeSFixed64: function(val) {
+        this.realloc(8);
+        writeInt32(this.buf, val & -1, this.pos);
+        writeInt32(this.buf, Math.floor(val * SHIFT_RIGHT_32), this.pos + 4);
+        this.pos += 8;
+    },
+
+    writeVarint: function(val) {
+        val = +val || 0;
+
+        if (val > 0xfffffff || val < 0) {
+            writeBigVarint(val, this);
+            return;
+        }
+
+        this.realloc(4);
+
+        this.buf[this.pos++] =           val & 0x7f  | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] = ((val >>>= 7) & 0x7f) | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] = ((val >>>= 7) & 0x7f) | (val > 0x7f ? 0x80 : 0); if (val <= 0x7f) return;
+        this.buf[this.pos++] =   (val >>> 7) & 0x7f;
+    },
+
+    writeSVarint: function(val) {
+        this.writeVarint(val < 0 ? -val * 2 - 1 : val * 2);
+    },
+
+    writeBoolean: function(val) {
+        this.writeVarint(Boolean(val));
+    },
+
+    writeString: function(str) {
+        str = String(str);
+        this.realloc(str.length * 4);
+
+        this.pos++; // reserve 1 byte for short string length
+
+        var startPos = this.pos;
+        // write the string directly to the buffer and see how much was written
+        this.pos = writeUtf8(this.buf, str, this.pos);
+        var len = this.pos - startPos;
+
+        if (len >= 0x80) makeRoomForExtraLength(startPos, len, this);
+
+        // finally, write the message length in the reserved place and restore the position
+        this.pos = startPos - 1;
+        this.writeVarint(len);
+        this.pos += len;
+    },
+
+    writeFloat: function(val) {
+        this.realloc(4);
+        ieee754.write(this.buf, val, this.pos, true, 23, 4);
+        this.pos += 4;
+    },
+
+    writeDouble: function(val) {
+        this.realloc(8);
+        ieee754.write(this.buf, val, this.pos, true, 52, 8);
+        this.pos += 8;
+    },
+
+    writeBytes: function(buffer) {
+        var len = buffer.length;
+        this.writeVarint(len);
+        this.realloc(len);
+        for (var i = 0; i < len; i++) this.buf[this.pos++] = buffer[i];
+    },
+
+    writeRawMessage: function(fn, obj) {
+        this.pos++; // reserve 1 byte for short message length
+
+        // write the message directly to the buffer and see how much was written
+        var startPos = this.pos;
+        fn(obj, this);
+        var len = this.pos - startPos;
+
+        if (len >= 0x80) makeRoomForExtraLength(startPos, len, this);
+
+        // finally, write the message length in the reserved place and restore the position
+        this.pos = startPos - 1;
+        this.writeVarint(len);
+        this.pos += len;
+    },
+
+    writeMessage: function(tag, fn, obj) {
+        this.writeTag(tag, Pbf.Bytes);
+        this.writeRawMessage(fn, obj);
+    },
+
+    writePackedVarint:   function(tag, arr) { this.writeMessage(tag, writePackedVarint, arr);   },
+    writePackedSVarint:  function(tag, arr) { this.writeMessage(tag, writePackedSVarint, arr);  },
+    writePackedBoolean:  function(tag, arr) { this.writeMessage(tag, writePackedBoolean, arr);  },
+    writePackedFloat:    function(tag, arr) { this.writeMessage(tag, writePackedFloat, arr);    },
+    writePackedDouble:   function(tag, arr) { this.writeMessage(tag, writePackedDouble, arr);   },
+    writePackedFixed32:  function(tag, arr) { this.writeMessage(tag, writePackedFixed32, arr);  },
+    writePackedSFixed32: function(tag, arr) { this.writeMessage(tag, writePackedSFixed32, arr); },
+    writePackedFixed64:  function(tag, arr) { this.writeMessage(tag, writePackedFixed64, arr);  },
+    writePackedSFixed64: function(tag, arr) { this.writeMessage(tag, writePackedSFixed64, arr); },
+
+    writeBytesField: function(tag, buffer) {
+        this.writeTag(tag, Pbf.Bytes);
+        this.writeBytes(buffer);
+    },
+    writeFixed32Field: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed32);
+        this.writeFixed32(val);
+    },
+    writeSFixed32Field: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed32);
+        this.writeSFixed32(val);
+    },
+    writeFixed64Field: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed64);
+        this.writeFixed64(val);
+    },
+    writeSFixed64Field: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed64);
+        this.writeSFixed64(val);
+    },
+    writeVarintField: function(tag, val) {
+        this.writeTag(tag, Pbf.Varint);
+        this.writeVarint(val);
+    },
+    writeSVarintField: function(tag, val) {
+        this.writeTag(tag, Pbf.Varint);
+        this.writeSVarint(val);
+    },
+    writeStringField: function(tag, str) {
+        this.writeTag(tag, Pbf.Bytes);
+        this.writeString(str);
+    },
+    writeFloatField: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed32);
+        this.writeFloat(val);
+    },
+    writeDoubleField: function(tag, val) {
+        this.writeTag(tag, Pbf.Fixed64);
+        this.writeDouble(val);
+    },
+    writeBooleanField: function(tag, val) {
+        this.writeVarintField(tag, Boolean(val));
+    }
+};
+
+function readVarintRemainder(l, s, p) {
+    var buf = p.buf,
+        h, b;
+
+    b = buf[p.pos++]; h  = (b & 0x70) >> 4;  if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 3;  if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 10; if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 17; if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x7f) << 24; if (b < 0x80) return toNum(l, h, s);
+    b = buf[p.pos++]; h |= (b & 0x01) << 31; if (b < 0x80) return toNum(l, h, s);
+
+    throw new Error('Expected varint not more than 10 bytes');
+}
+
+function readPackedEnd(pbf) {
+    return pbf.type === Pbf.Bytes ?
+        pbf.readVarint() + pbf.pos : pbf.pos + 1;
+}
+
+function toNum(low, high, isSigned) {
+    if (isSigned) {
+        return high * 0x100000000 + (low >>> 0);
+    }
+
+    return ((high >>> 0) * 0x100000000) + (low >>> 0);
+}
+
+function writeBigVarint(val, pbf) {
+    var low, high;
+
+    if (val >= 0) {
+        low  = (val % 0x100000000) | 0;
+        high = (val / 0x100000000) | 0;
+    } else {
+        low  = ~(-val % 0x100000000);
+        high = ~(-val / 0x100000000);
+
+        if (low ^ 0xffffffff) {
+            low = (low + 1) | 0;
+        } else {
+            low = 0;
+            high = (high + 1) | 0;
+        }
+    }
+
+    if (val >= 0x10000000000000000 || val < -0x10000000000000000) {
+        throw new Error('Given varint doesn\'t fit into 10 bytes');
+    }
+
+    pbf.realloc(10);
+
+    writeBigVarintLow(low, high, pbf);
+    writeBigVarintHigh(high, pbf);
+}
+
+function writeBigVarintLow(low, high, pbf) {
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos++] = low & 0x7f | 0x80; low >>>= 7;
+    pbf.buf[pbf.pos]   = low & 0x7f;
+}
+
+function writeBigVarintHigh(high, pbf) {
+    var lsb = (high & 0x07) << 4;
+
+    pbf.buf[pbf.pos++] |= lsb         | ((high >>>= 3) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f | ((high >>>= 7) ? 0x80 : 0); if (!high) return;
+    pbf.buf[pbf.pos++]  = high & 0x7f;
+}
+
+function makeRoomForExtraLength(startPos, len, pbf) {
+    var extraLen =
+        len <= 0x3fff ? 1 :
+        len <= 0x1fffff ? 2 :
+        len <= 0xfffffff ? 3 : Math.ceil(Math.log(len) / (Math.LN2 * 7));
+
+    // if 1 byte isn't enough for encoding message length, shift the data to the right
+    pbf.realloc(extraLen);
+    for (var i = pbf.pos - 1; i >= startPos; i--) pbf.buf[i + extraLen] = pbf.buf[i];
+}
+
+function writePackedVarint(arr, pbf)   { for (var i = 0; i < arr.length; i++) pbf.writeVarint(arr[i]);   }
+function writePackedSVarint(arr, pbf)  { for (var i = 0; i < arr.length; i++) pbf.writeSVarint(arr[i]);  }
+function writePackedFloat(arr, pbf)    { for (var i = 0; i < arr.length; i++) pbf.writeFloat(arr[i]);    }
+function writePackedDouble(arr, pbf)   { for (var i = 0; i < arr.length; i++) pbf.writeDouble(arr[i]);   }
+function writePackedBoolean(arr, pbf)  { for (var i = 0; i < arr.length; i++) pbf.writeBoolean(arr[i]);  }
+function writePackedFixed32(arr, pbf)  { for (var i = 0; i < arr.length; i++) pbf.writeFixed32(arr[i]);  }
+function writePackedSFixed32(arr, pbf) { for (var i = 0; i < arr.length; i++) pbf.writeSFixed32(arr[i]); }
+function writePackedFixed64(arr, pbf)  { for (var i = 0; i < arr.length; i++) pbf.writeFixed64(arr[i]);  }
+function writePackedSFixed64(arr, pbf) { for (var i = 0; i < arr.length; i++) pbf.writeSFixed64(arr[i]); }
+
+// Buffer code below from https://github.com/feross/buffer, MIT-licensed
+
+function readUInt32(buf, pos) {
+    return ((buf[pos]) |
+        (buf[pos + 1] << 8) |
+        (buf[pos + 2] << 16)) +
+        (buf[pos + 3] * 0x1000000);
+}
+
+function writeInt32(buf, val, pos) {
+    buf[pos] = val;
+    buf[pos + 1] = (val >>> 8);
+    buf[pos + 2] = (val >>> 16);
+    buf[pos + 3] = (val >>> 24);
+}
+
+function readInt32(buf, pos) {
+    return ((buf[pos]) |
+        (buf[pos + 1] << 8) |
+        (buf[pos + 2] << 16)) +
+        (buf[pos + 3] << 24);
+}
+
+function readUtf8(buf, pos, end) {
+    var str = '';
+    var i = pos;
+
+    while (i < end) {
+        var b0 = buf[i];
+        var c = null; // codepoint
+        var bytesPerSequence =
+            b0 > 0xEF ? 4 :
+            b0 > 0xDF ? 3 :
+            b0 > 0xBF ? 2 : 1;
+
+        if (i + bytesPerSequence > end) break;
+
+        var b1, b2, b3;
+
+        if (bytesPerSequence === 1) {
+            if (b0 < 0x80) {
+                c = b0;
+            }
+        } else if (bytesPerSequence === 2) {
+            b1 = buf[i + 1];
+            if ((b1 & 0xC0) === 0x80) {
+                c = (b0 & 0x1F) << 0x6 | (b1 & 0x3F);
+                if (c <= 0x7F) {
+                    c = null;
+                }
+            }
+        } else if (bytesPerSequence === 3) {
+            b1 = buf[i + 1];
+            b2 = buf[i + 2];
+            if ((b1 & 0xC0) === 0x80 && (b2 & 0xC0) === 0x80) {
+                c = (b0 & 0xF) << 0xC | (b1 & 0x3F) << 0x6 | (b2 & 0x3F);
+                if (c <= 0x7FF || (c >= 0xD800 && c <= 0xDFFF)) {
+                    c = null;
+                }
+            }
+        } else if (bytesPerSequence === 4) {
+            b1 = buf[i + 1];
+            b2 = buf[i + 2];
+            b3 = buf[i + 3];
+            if ((b1 & 0xC0) === 0x80 && (b2 & 0xC0) === 0x80 && (b3 & 0xC0) === 0x80) {
+                c = (b0 & 0xF) << 0x12 | (b1 & 0x3F) << 0xC | (b2 & 0x3F) << 0x6 | (b3 & 0x3F);
+                if (c <= 0xFFFF || c >= 0x110000) {
+                    c = null;
+                }
+            }
+        }
+
+        if (c === null) {
+            c = 0xFFFD;
+            bytesPerSequence = 1;
+
+        } else if (c > 0xFFFF) {
+            c -= 0x10000;
+            str += String.fromCharCode(c >>> 10 & 0x3FF | 0xD800);
+            c = 0xDC00 | c & 0x3FF;
+        }
+
+        str += String.fromCharCode(c);
+        i += bytesPerSequence;
+    }
+
+    return str;
+}
+
+function writeUtf8(buf, str, pos) {
+    for (var i = 0, c, lead; i < str.length; i++) {
+        c = str.charCodeAt(i); // code point
+
+        if (c > 0xD7FF && c < 0xE000) {
+            if (lead) {
+                if (c < 0xDC00) {
+                    buf[pos++] = 0xEF;
+                    buf[pos++] = 0xBF;
+                    buf[pos++] = 0xBD;
+                    lead = c;
+                    continue;
+                } else {
+                    c = lead - 0xD800 << 10 | c - 0xDC00 | 0x10000;
+                    lead = null;
+                }
+            } else {
+                if (c > 0xDBFF || (i + 1 === str.length)) {
+                    buf[pos++] = 0xEF;
+                    buf[pos++] = 0xBF;
+                    buf[pos++] = 0xBD;
+                } else {
+                    lead = c;
+                }
+                continue;
+            }
+        } else if (lead) {
+            buf[pos++] = 0xEF;
+            buf[pos++] = 0xBF;
+            buf[pos++] = 0xBD;
+            lead = null;
+        }
+
+        if (c < 0x80) {
+            buf[pos++] = c;
+        } else {
+            if (c < 0x800) {
+                buf[pos++] = c >> 0x6 | 0xC0;
+            } else {
+                if (c < 0x10000) {
+                    buf[pos++] = c >> 0xC | 0xE0;
+                } else {
+                    buf[pos++] = c >> 0x12 | 0xF0;
+                    buf[pos++] = c >> 0xC & 0x3F | 0x80;
+                }
+                buf[pos++] = c >> 0x6 & 0x3F | 0x80;
+            }
+            buf[pos++] = c & 0x3F | 0x80;
+        }
+    }
+    return pos;
+}
+
+},{"ieee754":"../node_modules/ieee754/index.js"}],"../node_modules/ol/render/Feature.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _array = require("../array.js");
+
+var _extent = require("../extent.js");
+
+var _GeometryType = _interopRequireDefault(require("../geom/GeometryType.js"));
+
+var _center = require("../geom/flat/center.js");
+
+var _interiorpoint = require("../geom/flat/interiorpoint.js");
+
+var _interpolate = require("../geom/flat/interpolate.js");
+
+var _proj = require("../proj.js");
+
+var _transform = require("../geom/flat/transform.js");
+
+var _transform2 = require("../transform.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/render/Feature
+ */
+
+/**
+ * @type {import("../transform.js").Transform}
+ */
+var tmpTransform = (0, _transform2.create)();
+/**
+ * Lightweight, read-only, {@link module:ol/Feature~Feature} and {@link module:ol/geom/Geometry~Geometry} like
+ * structure, optimized for vector tile rendering and styling. Geometry access
+ * through the API is limited to getting the type and extent of the geometry.
+ *
+ * @param {GeometryType} type Geometry type.
+ * @param {Array<number>} flatCoordinates Flat coordinates. These always need
+ *     to be right-handed for polygons.
+ * @param {Array<number>|Array<Array<number>>} ends Ends or Endss.
+ * @param {Object<string, *>} properties Properties.
+ * @param {number|string|undefined} id Feature id.
+ */
+
+var RenderFeature = function RenderFeature(type, flatCoordinates, ends, properties, id) {
+  /**
+  * @private
+  * @type {import("../extent.js").Extent|undefined}
+  */
+  this.extent_;
+  /**
+  * @private
+  * @type {number|string|undefined}
+  */
+
+  this.id_ = id;
+  /**
+  * @private
+  * @type {GeometryType}
+  */
+
+  this.type_ = type;
+  /**
+  * @private
+  * @type {Array<number>}
+  */
+
+  this.flatCoordinates_ = flatCoordinates;
+  /**
+  * @private
+  * @type {Array<number>}
+  */
+
+  this.flatInteriorPoints_ = null;
+  /**
+  * @private
+  * @type {Array<number>}
+  */
+
+  this.flatMidpoints_ = null;
+  /**
+  * @private
+  * @type {Array<number>|Array<Array<number>>}
+  */
+
+  this.ends_ = ends;
+  /**
+  * @private
+  * @type {Object<string, *>}
+  */
+
+  this.properties_ = properties;
+};
+/**
+* Get a feature property by its key.
+* @param {string} key Key
+* @return {*} Value for the requested key.
+* @api
+*/
+
+
+RenderFeature.prototype.get = function get(key) {
+  return this.properties_[key];
+};
+/**
+* Get the extent of this feature's geometry.
+* @return {import("../extent.js").Extent} Extent.
+* @api
+*/
+
+
+RenderFeature.prototype.getExtent = function getExtent() {
+  if (!this.extent_) {
+    this.extent_ = this.type_ === _GeometryType.default.POINT ? (0, _extent.createOrUpdateFromCoordinate)(this.flatCoordinates_) : (0, _extent.createOrUpdateFromFlatCoordinates)(this.flatCoordinates_, 0, this.flatCoordinates_.length, 2);
+  }
+
+  return this.extent_;
+};
+/**
+* @return {Array<number>} Flat interior points.
+*/
+
+
+RenderFeature.prototype.getFlatInteriorPoint = function getFlatInteriorPoint() {
+  if (!this.flatInteriorPoints_) {
+    var flatCenter = (0, _extent.getCenter)(this.getExtent());
+    this.flatInteriorPoints_ = (0, _interiorpoint.getInteriorPointOfArray)(this.flatCoordinates_, 0,
+    /** @type {Array<number>} */
+    this.ends_, 2, flatCenter, 0);
+  }
+
+  return this.flatInteriorPoints_;
+};
+/**
+* @return {Array<number>} Flat interior points.
+*/
+
+
+RenderFeature.prototype.getFlatInteriorPoints = function getFlatInteriorPoints() {
+  if (!this.flatInteriorPoints_) {
+    var flatCenters = (0, _center.linearRingss)(this.flatCoordinates_, 0,
+    /** @type {Array<Array<number>>} */
+    this.ends_, 2);
+    this.flatInteriorPoints_ = (0, _interiorpoint.getInteriorPointsOfMultiArray)(this.flatCoordinates_, 0,
+    /** @type {Array<Array<number>>} */
+    this.ends_, 2, flatCenters);
+  }
+
+  return this.flatInteriorPoints_;
+};
+/**
+* @return {Array<number>} Flat midpoint.
+*/
+
+
+RenderFeature.prototype.getFlatMidpoint = function getFlatMidpoint() {
+  if (!this.flatMidpoints_) {
+    this.flatMidpoints_ = (0, _interpolate.interpolatePoint)(this.flatCoordinates_, 0, this.flatCoordinates_.length, 2, 0.5);
+  }
+
+  return this.flatMidpoints_;
+};
+/**
+* @return {Array<number>} Flat midpoints.
+*/
+
+
+RenderFeature.prototype.getFlatMidpoints = function getFlatMidpoints() {
+  if (!this.flatMidpoints_) {
+    this.flatMidpoints_ = [];
+    var flatCoordinates = this.flatCoordinates_;
+    var offset = 0;
+    var ends =
+    /** @type {Array<number>} */
+    this.ends_;
+
+    for (var i = 0, ii = ends.length; i < ii; ++i) {
+      var end = ends[i];
+      var midpoint = (0, _interpolate.interpolatePoint)(flatCoordinates, offset, end, 2, 0.5);
+      (0, _array.extend)(this.flatMidpoints_, midpoint);
+      offset = end;
+    }
+  }
+
+  return this.flatMidpoints_;
+};
+/**
+* Get the feature identifier.This is a stable identifier for the feature and
+* is set when reading data from a remote source.
+* @return {number|string|undefined} Id.
+* @api
+*/
+
+
+RenderFeature.prototype.getId = function getId() {
+  return this.id_;
+};
+/**
+* @return {Array<number>} Flat coordinates.
+*/
+
+
+RenderFeature.prototype.getOrientedFlatCoordinates = function getOrientedFlatCoordinates() {
+  return this.flatCoordinates_;
+};
+/**
+* For API compatibility with {@link module:ol/Feature~Feature}, this method is useful when
+* determining the geometry type in style function (see {@link #getType}).
+* @return {RenderFeature} Feature.
+* @api
+*/
+
+
+RenderFeature.prototype.getGeometry = function getGeometry() {
+  return this;
+};
+/**
+ * @param {number} squaredTolerance Squared tolerance.
+ * @return {RenderFeature} Simplified geometry.
+ */
+
+
+RenderFeature.prototype.getSimplifiedGeometry = function getSimplifiedGeometry(squaredTolerance) {
+  return this;
+};
+/**
+* Get the feature properties.
+* @return {Object<string, *>} Feature properties.
+* @api
+*/
+
+
+RenderFeature.prototype.getProperties = function getProperties() {
+  return this.properties_;
+};
+/**
+* @return {number} Stride.
+*/
+
+
+RenderFeature.prototype.getStride = function getStride() {
+  return 2;
+};
+/**
+ * @return {undefined}
+ */
+
+
+RenderFeature.prototype.getStyleFunction = function getStyleFunction() {
+  return undefined;
+};
+/**
+* Get the type of this feature's geometry.
+* @return {GeometryType} Geometry type.
+* @api
+*/
+
+
+RenderFeature.prototype.getType = function getType() {
+  return this.type_;
+};
+/**
+* Transform geometry coordinates from tile pixel space to projected.
+* The SRS of the source and destination are expected to be the same.
+*
+* @param {import("../proj.js").ProjectionLike} source The current projection
+* @param {import("../proj.js").ProjectionLike} destination The desired projection.
+*/
+
+
+RenderFeature.prototype.transform = function transform(source, destination) {
+  source = (0, _proj.get)(source);
+  var pixelExtent = source.getExtent();
+  var projectedExtent = source.getWorldExtent();
+  var scale = (0, _extent.getHeight)(projectedExtent) / (0, _extent.getHeight)(pixelExtent);
+  (0, _transform2.compose)(tmpTransform, projectedExtent[0], projectedExtent[3], scale, -scale, 0, 0, 0);
+  (0, _transform.transform2D)(this.flatCoordinates_, 0, this.flatCoordinates_.length, 2, tmpTransform, this.flatCoordinates_);
+};
+/**
+ * @return {Array<number>|Array<Array<number>>} Ends or endss.
+ */
+
+
+RenderFeature.prototype.getEnds = RenderFeature.prototype.getEndss = function () {
+  return this.ends_;
+};
+/**
+ * @return {Array<number>} Flat coordinates.
+ */
+
+
+RenderFeature.prototype.getFlatCoordinates = RenderFeature.prototype.getOrientedFlatCoordinates;
+var _default = RenderFeature;
+exports.default = _default;
+},{"../array.js":"../node_modules/ol/array.js","../extent.js":"../node_modules/ol/extent.js","../geom/GeometryType.js":"../node_modules/ol/geom/GeometryType.js","../geom/flat/center.js":"../node_modules/ol/geom/flat/center.js","../geom/flat/interiorpoint.js":"../node_modules/ol/geom/flat/interiorpoint.js","../geom/flat/interpolate.js":"../node_modules/ol/geom/flat/interpolate.js","../proj.js":"../node_modules/ol/proj.js","../geom/flat/transform.js":"../node_modules/ol/geom/flat/transform.js","../transform.js":"../node_modules/ol/transform.js"}],"../node_modules/ol/format/MVT.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _asserts = require("../asserts.js");
+
+var _pbf = _interopRequireDefault(require("pbf"));
+
+var _Feature = _interopRequireWildcard(require("./Feature.js"));
+
+var _FormatType = _interopRequireDefault(require("./FormatType.js"));
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _GeometryType = _interopRequireDefault(require("../geom/GeometryType.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _MultiPoint = _interopRequireDefault(require("../geom/MultiPoint.js"));
+
+var _MultiPolygon = _interopRequireDefault(require("../geom/MultiPolygon.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _Polygon = _interopRequireDefault(require("../geom/Polygon.js"));
+
+var _orient = require("../geom/flat/orient.js");
+
+var _Projection = _interopRequireDefault(require("../proj/Projection.js"));
+
+var _Units = _interopRequireDefault(require("../proj/Units.js"));
+
+var _Feature2 = _interopRequireDefault(require("../render/Feature.js"));
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = Object.defineProperty && Object.getOwnPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : {}; if (desc.get || desc.set) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } } newObj.default = obj; return newObj; } }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/MVT
+ */
+//FIXME Implement projection handling
+
+/**
+ * @typedef {Object} Options
+ * @property {import("../Feature.js").FeatureClass} [featureClass] Class for features returned by
+ * {@link module:ol/format/MVT#readFeatures}. Set to {@link module:ol/Feature~Feature} to get full editing and geometry
+ * support at the cost of decreased rendering performance. The default is
+ * {@link module:ol/render/Feature~RenderFeature}, which is optimized for rendering and hit detection.
+ * @property {string} [geometryName='geometry'] Geometry name to use when creating features.
+ * @property {string} [layerName='layer'] Name of the feature attribute that holds the layer name.
+ * @property {Array<string>} [layers] Layers to read features from. If not provided, features will be read from all
+ * layers.
+ */
+
+/**
+ * @classdesc
+ * Feature format for reading data in the Mapbox MVT format.
+ *
+ * @param {Options=} opt_options Options.
+ * @api
+ */
+var MVT =
+/*@__PURE__*/
+function (FeatureFormat) {
+  function MVT(opt_options) {
+    FeatureFormat.call(this);
+    var options = opt_options ? opt_options : {};
+    /**
+     * @type {Projection}
+     */
+
+    this.dataProjection = new _Projection.default({
+      code: '',
+      units: _Units.default.TILE_PIXELS
+    });
+    /**
+     * @private
+     * @type {import("../Feature.js").FeatureClass}
+     */
+
+    this.featureClass_ = options.featureClass ? options.featureClass : _Feature2.default;
+    /**
+     * @private
+     * @type {string|undefined}
+     */
+
+    this.geometryName_ = options.geometryName;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    this.layerName_ = options.layerName ? options.layerName : 'layer';
+    /**
+     * @private
+     * @type {Array<string>}
+     */
+
+    this.layers_ = options.layers ? options.layers : null;
+    /**
+     * @private
+     * @type {import("../extent.js").Extent}
+     */
+
+    this.extent_ = null;
+  }
+
+  if (FeatureFormat) MVT.__proto__ = FeatureFormat;
+  MVT.prototype = Object.create(FeatureFormat && FeatureFormat.prototype);
+  MVT.prototype.constructor = MVT;
+  /**
+   * Read the raw geometry from the pbf offset stored in a raw feature's geometry
+   * property.
+   * @suppress {missingProperties}
+   * @param {Object} pbf PBF.
+   * @param {Object} feature Raw feature.
+   * @param {Array<number>} flatCoordinates Array to store flat coordinates in.
+   * @param {Array<number>} ends Array to store ends in.
+   * @private
+   */
+
+  MVT.prototype.readRawGeometry_ = function readRawGeometry_(pbf, feature, flatCoordinates, ends) {
+    pbf.pos = feature.geometry;
+    var end = pbf.readVarint() + pbf.pos;
+    var cmd = 1;
+    var length = 0;
+    var x = 0;
+    var y = 0;
+    var coordsLen = 0;
+    var currentEnd = 0;
+
+    while (pbf.pos < end) {
+      if (!length) {
+        var cmdLen = pbf.readVarint();
+        cmd = cmdLen & 0x7;
+        length = cmdLen >> 3;
+      }
+
+      length--;
+
+      if (cmd === 1 || cmd === 2) {
+        x += pbf.readSVarint();
+        y += pbf.readSVarint();
+
+        if (cmd === 1) {
+          // moveTo
+          if (coordsLen > currentEnd) {
+            ends.push(coordsLen);
+            currentEnd = coordsLen;
+          }
+        }
+
+        flatCoordinates.push(x, y);
+        coordsLen += 2;
+      } else if (cmd === 7) {
+        if (coordsLen > currentEnd) {
+          // close polygon
+          flatCoordinates.push(flatCoordinates[currentEnd], flatCoordinates[currentEnd + 1]);
+          coordsLen += 2;
+        }
+      } else {
+        (0, _asserts.assert)(false, 59); // Invalid command found in the PBF
+      }
+    }
+
+    if (coordsLen > currentEnd) {
+      ends.push(coordsLen);
+      currentEnd = coordsLen;
+    }
+  };
+  /**
+   * @private
+   * @param {Object} pbf PBF
+   * @param {Object} rawFeature Raw Mapbox feature.
+   * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+   * @return {import("../Feature.js").FeatureLike} Feature.
+   */
+
+
+  MVT.prototype.createFeature_ = function createFeature_(pbf, rawFeature, opt_options) {
+    var type = rawFeature.type;
+
+    if (type === 0) {
+      return null;
+    }
+
+    var feature;
+    var id = rawFeature.id;
+    var values = rawFeature.properties;
+    values[this.layerName_] = rawFeature.layer.name;
+    var flatCoordinates = [];
+    var ends = [];
+    this.readRawGeometry_(pbf, rawFeature, flatCoordinates, ends);
+    var geometryType = getGeometryType(type, ends.length);
+
+    if (this.featureClass_ === _Feature2.default) {
+      feature = new this.featureClass_(geometryType, flatCoordinates, ends, values, id);
+    } else {
+      var geom;
+
+      if (geometryType == _GeometryType.default.POLYGON) {
+        var endss = [];
+        var offset = 0;
+        var prevEndIndex = 0;
+
+        for (var i = 0, ii = ends.length; i < ii; ++i) {
+          var end = ends[i];
+
+          if (!(0, _orient.linearRingIsClockwise)(flatCoordinates, offset, end, 2)) {
+            endss.push(ends.slice(prevEndIndex, i));
+            prevEndIndex = i;
+          }
+
+          offset = end;
+        }
+
+        if (endss.length > 1) {
+          geom = new _MultiPolygon.default(flatCoordinates, _GeometryLayout.default.XY, endss);
+        } else {
+          geom = new _Polygon.default(flatCoordinates, _GeometryLayout.default.XY, ends);
+        }
+      } else {
+        geom = geometryType === _GeometryType.default.POINT ? new _Point.default(flatCoordinates, _GeometryLayout.default.XY) : geometryType === _GeometryType.default.LINE_STRING ? new _LineString.default(flatCoordinates, _GeometryLayout.default.XY) : geometryType === _GeometryType.default.POLYGON ? new _Polygon.default(flatCoordinates, _GeometryLayout.default.XY, ends) : geometryType === _GeometryType.default.MULTI_POINT ? new _MultiPoint.default(flatCoordinates, _GeometryLayout.default.XY) : geometryType === _GeometryType.default.MULTI_LINE_STRING ? new _MultiLineString.default(flatCoordinates, _GeometryLayout.default.XY, ends) : null;
+      }
+
+      var ctor =
+      /** @type {typeof import("../Feature.js").default} */
+      this.featureClass_;
+      feature = new ctor();
+
+      if (this.geometryName_) {
+        feature.setGeometryName(this.geometryName_);
+      }
+
+      var geometry =
+      /** @type {import("../geom/Geometry.js").default} */
+      (0, _Feature.transformWithOptions)(geom, false, this.adaptOptions(opt_options));
+      feature.setGeometry(geometry);
+      feature.setId(id);
+      feature.setProperties(values);
+    }
+
+    return feature;
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  MVT.prototype.getLastExtent = function getLastExtent() {
+    return this.extent_;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  MVT.prototype.getType = function getType() {
+    return _FormatType.default.ARRAY_BUFFER;
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  MVT.prototype.readFeatures = function readFeatures(source, opt_options) {
+    var layers = this.layers_;
+    var pbf = new _pbf.default(
+    /** @type {ArrayBuffer} */
+    source);
+    var pbfLayers = pbf.readFields(layersPBFReader, {});
+    /** @type {Array<import("../Feature.js").FeatureLike>} */
+
+    var features = [];
+
+    for (var name in pbfLayers) {
+      if (layers && layers.indexOf(name) == -1) {
+        continue;
+      }
+
+      var pbfLayer = pbfLayers[name];
+
+      for (var i = 0, ii = pbfLayer.length; i < ii; ++i) {
+        var rawFeature = readRawFeature(pbf, pbfLayer, i);
+        features.push(this.createFeature_(pbf, rawFeature));
+      }
+
+      this.extent_ = pbfLayer ? [0, 0, pbfLayer.extent, pbfLayer.extent] : null;
+    }
+
+    return features;
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  MVT.prototype.readProjection = function readProjection(source) {
+    return this.dataProjection;
+  };
+  /**
+   * Sets the layers that features will be read from.
+   * @param {Array<string>} layers Layers.
+   * @api
+   */
+
+
+  MVT.prototype.setLayers = function setLayers(layers) {
+    this.layers_ = layers;
+  };
+
+  return MVT;
+}(_Feature.default);
+/**
+ * Reader callback for parsing layers.
+ * @param {number} tag The tag.
+ * @param {Object} layers The layers object.
+ * @param {Object} pbf The PBF.
+ */
+
+
+function layersPBFReader(tag, layers, pbf) {
+  if (tag === 3) {
+    var layer = {
+      keys: [],
+      values: [],
+      features: []
+    };
+    var end = pbf.readVarint() + pbf.pos;
+    pbf.readFields(layerPBFReader, layer, end);
+    layer.length = layer.features.length;
+
+    if (layer.length) {
+      layers[layer.name] = layer;
+    }
+  }
+}
+/**
+ * Reader callback for parsing layer.
+ * @param {number} tag The tag.
+ * @param {Object} layer The layer object.
+ * @param {Object} pbf The PBF.
+ */
+
+
+function layerPBFReader(tag, layer, pbf) {
+  if (tag === 15) {
+    layer.version = pbf.readVarint();
+  } else if (tag === 1) {
+    layer.name = pbf.readString();
+  } else if (tag === 5) {
+    layer.extent = pbf.readVarint();
+  } else if (tag === 2) {
+    layer.features.push(pbf.pos);
+  } else if (tag === 3) {
+    layer.keys.push(pbf.readString());
+  } else if (tag === 4) {
+    var value = null;
+    var end = pbf.readVarint() + pbf.pos;
+
+    while (pbf.pos < end) {
+      tag = pbf.readVarint() >> 3;
+      value = tag === 1 ? pbf.readString() : tag === 2 ? pbf.readFloat() : tag === 3 ? pbf.readDouble() : tag === 4 ? pbf.readVarint64() : tag === 5 ? pbf.readVarint() : tag === 6 ? pbf.readSVarint() : tag === 7 ? pbf.readBoolean() : null;
+    }
+
+    layer.values.push(value);
+  }
+}
+/**
+ * Reader callback for parsing feature.
+ * @param {number} tag The tag.
+ * @param {Object} feature The feature object.
+ * @param {Object} pbf The PBF.
+ */
+
+
+function featurePBFReader(tag, feature, pbf) {
+  if (tag == 1) {
+    feature.id = pbf.readVarint();
+  } else if (tag == 2) {
+    var end = pbf.readVarint() + pbf.pos;
+
+    while (pbf.pos < end) {
+      var key = feature.layer.keys[pbf.readVarint()];
+      var value = feature.layer.values[pbf.readVarint()];
+      feature.properties[key] = value;
+    }
+  } else if (tag == 3) {
+    feature.type = pbf.readVarint();
+  } else if (tag == 4) {
+    feature.geometry = pbf.pos;
+  }
+}
+/**
+ * Read a raw feature from the pbf offset stored at index `i` in the raw layer.
+ * @suppress {missingProperties}
+ * @param {Object} pbf PBF.
+ * @param {Object} layer Raw layer.
+ * @param {number} i Index of the feature in the raw layer's `features` array.
+ * @return {Object} Raw feature.
+ */
+
+
+function readRawFeature(pbf, layer, i) {
+  pbf.pos = layer.features[i];
+  var end = pbf.readVarint() + pbf.pos;
+  var feature = {
+    layer: layer,
+    type: 0,
+    properties: {}
+  };
+  pbf.readFields(featurePBFReader, feature, end);
+  return feature;
+}
+/**
+ * @suppress {missingProperties}
+ * @param {number} type The raw feature's geometry type
+ * @param {number} numEnds Number of ends of the flat coordinates of the
+ * geometry.
+ * @return {GeometryType} The geometry type.
+ */
+
+
+function getGeometryType(type, numEnds) {
+  /** @type {GeometryType} */
+  var geometryType;
+
+  if (type === 1) {
+    geometryType = numEnds === 1 ? _GeometryType.default.POINT : _GeometryType.default.MULTI_POINT;
+  } else if (type === 2) {
+    geometryType = numEnds === 1 ? _GeometryType.default.LINE_STRING : _GeometryType.default.MULTI_LINE_STRING;
+  } else if (type === 3) {
+    geometryType = _GeometryType.default.POLYGON; // MultiPolygon not relevant for rendering - winding order determines
+    // outer rings of polygons.
+  }
+
+  return geometryType;
+}
+
+var _default = MVT;
+exports.default = _default;
+},{"../asserts.js":"../node_modules/ol/asserts.js","pbf":"../node_modules/pbf/index.js","./Feature.js":"../node_modules/ol/format/Feature.js","./FormatType.js":"../node_modules/ol/format/FormatType.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/GeometryType.js":"../node_modules/ol/geom/GeometryType.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/MultiPoint.js":"../node_modules/ol/geom/MultiPoint.js","../geom/MultiPolygon.js":"../node_modules/ol/geom/MultiPolygon.js","../geom/Point.js":"../node_modules/ol/geom/Point.js","../geom/Polygon.js":"../node_modules/ol/geom/Polygon.js","../geom/flat/orient.js":"../node_modules/ol/geom/flat/orient.js","../proj/Projection.js":"../node_modules/ol/proj/Projection.js","../proj/Units.js":"../node_modules/ol/proj/Units.js","../render/Feature.js":"../node_modules/ol/render/Feature.js"}],"../node_modules/ol/format/XLink.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.readHref = readHref;
+
+/**
+ * @module ol/format/XLink
+ */
+
+/**
+ * @const
+ * @type {string}
+ */
+var NAMESPACE_URI = 'http://www.w3.org/1999/xlink';
+/**
+ * @param {Element} node Node.
+ * @return {string|undefined} href.
+ */
+
+function readHref(node) {
+  return node.getAttributeNS(NAMESPACE_URI, 'href');
+}
+},{}],"../node_modules/ol/format/XML.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _xml = require("../xml.js");
+
+/**
+ * @module ol/format/XML
+ */
+
+/**
+ * @classdesc
+ * Generic format for reading non-feature XML data
+ *
+ * @abstract
+ */
+var XML = function XML() {};
+
+XML.prototype.read = function read(source) {
+  if (!source) {
+    return null;
+  } else if (typeof source === 'string') {
+    var doc = (0, _xml.parse)(source);
+    return this.readFromDocument(doc);
+  } else if ((0, _xml.isDocument)(source)) {
+    return this.readFromDocument(
+    /** @type {Document} */
+    source);
+  } else {
+    return this.readFromNode(
+    /** @type {Element} */
+    source);
+  }
+};
+/**
+ * @abstract
+ * @param {Document} doc Document.
+ * @return {Object} Object
+ */
+
+
+XML.prototype.readFromDocument = function readFromDocument(doc) {};
+/**
+ * @abstract
+ * @param {Element} node Node.
+ * @return {Object} Object
+ */
+
+
+XML.prototype.readFromNode = function readFromNode(node) {};
+
+var _default = XML;
+exports.default = _default;
+},{"../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/OWS.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _XLink = require("./XLink.js");
+
+var _XML = _interopRequireDefault(require("./XML.js"));
+
+var _xsd = require("./xsd.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/OWS
+ */
+
+/**
+ * @const
+ * @type {Array<null|string>}
+ */
+var NAMESPACE_URIS = [null, 'http://www.opengis.net/ows/1.1'];
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ServiceIdentification': (0, _xml.makeObjectPropertySetter)(readServiceIdentification),
+  'ServiceProvider': (0, _xml.makeObjectPropertySetter)(readServiceProvider),
+  'OperationsMetadata': (0, _xml.makeObjectPropertySetter)(readOperationsMetadata)
+});
+
+var OWS =
+/*@__PURE__*/
+function (XML) {
+  function OWS() {
+    XML.call(this);
+  }
+
+  if (XML) OWS.__proto__ = XML;
+  OWS.prototype = Object.create(XML && XML.prototype);
+  OWS.prototype.constructor = OWS;
+  /**
+   * @inheritDoc
+   */
+
+  OWS.prototype.readFromDocument = function readFromDocument(doc) {
+    for (var n = doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        return this.readFromNode(n);
+      }
+    }
+
+    return null;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  OWS.prototype.readFromNode = function readFromNode(node) {
+    var owsObject = (0, _xml.pushParseAndPop)({}, PARSERS, node, []);
+    return owsObject ? owsObject : null;
+  };
+
+  return OWS;
+}(_XML.default);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var ADDRESS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'DeliveryPoint': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'City': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'AdministrativeArea': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'PostalCode': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Country': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ElectronicMailAddress': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var ALLOWED_VALUES_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Value': (0, _xml.makeObjectPropertyPusher)(readValue)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var CONSTRAINT_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'AllowedValues': (0, _xml.makeObjectPropertySetter)(readAllowedValues)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var CONTACT_INFO_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Phone': (0, _xml.makeObjectPropertySetter)(readPhone),
+  'Address': (0, _xml.makeObjectPropertySetter)(readAddress)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var DCP_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'HTTP': (0, _xml.makeObjectPropertySetter)(readHttp)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var HTTP_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Get': (0, _xml.makeObjectPropertyPusher)(readGet),
+  'Post': undefined // TODO
+
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var OPERATION_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'DCP': (0, _xml.makeObjectPropertySetter)(readDcp)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var OPERATIONS_METADATA_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Operation': readOperation
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var PHONE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Voice': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Facsimile': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var REQUEST_METHOD_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Constraint': (0, _xml.makeObjectPropertyPusher)(readConstraint)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var SERVICE_CONTACT_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'IndividualName': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'PositionName': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ContactInfo': (0, _xml.makeObjectPropertySetter)(readContactInfo)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var SERVICE_IDENTIFICATION_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Abstract': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'AccessConstraints': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Fees': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Title': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ServiceTypeVersion': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ServiceType': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var SERVICE_PROVIDER_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ProviderName': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ProviderSite': (0, _xml.makeObjectPropertySetter)(_XLink.readHref),
+  'ServiceContact': (0, _xml.makeObjectPropertySetter)(readServiceContact)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The address.
+ */
+
+function readAddress(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, ADDRESS_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The values.
+ */
+
+
+function readAllowedValues(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, ALLOWED_VALUES_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The constraint.
+ */
+
+
+function readConstraint(node, objectStack) {
+  var name = node.getAttribute('name');
+
+  if (!name) {
+    return undefined;
+  }
+
+  return (0, _xml.pushParseAndPop)({
+    'name': name
+  }, CONSTRAINT_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The contact info.
+ */
+
+
+function readContactInfo(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, CONTACT_INFO_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The DCP.
+ */
+
+
+function readDcp(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, DCP_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The GET object.
+ */
+
+
+function readGet(node, objectStack) {
+  var href = (0, _XLink.readHref)(node);
+
+  if (!href) {
+    return undefined;
+  }
+
+  return (0, _xml.pushParseAndPop)({
+    'href': href
+  }, REQUEST_METHOD_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The HTTP object.
+ */
+
+
+function readHttp(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, HTTP_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The operation.
+ */
+
+
+function readOperation(node, objectStack) {
+  var name = node.getAttribute('name');
+  var value = (0, _xml.pushParseAndPop)({}, OPERATION_PARSERS, node, objectStack);
+
+  if (!value) {
+    return undefined;
+  }
+
+  var object =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  object[name] = value;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The operations metadata.
+ */
+
+
+function readOperationsMetadata(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, OPERATIONS_METADATA_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The phone.
+ */
+
+
+function readPhone(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, PHONE_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The service identification.
+ */
+
+
+function readServiceIdentification(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, SERVICE_IDENTIFICATION_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The service contact.
+ */
+
+
+function readServiceContact(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, SERVICE_CONTACT_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} The service provider.
+ */
+
+
+function readServiceProvider(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, SERVICE_PROVIDER_PARSERS, node, objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {string|undefined} The value.
+ */
+
+
+function readValue(node, objectStack) {
+  return (0, _xsd.readString)(node);
+}
+
+var _default = OWS;
+exports.default = _default;
+},{"./XLink.js":"../node_modules/ol/format/XLink.js","./XML.js":"../node_modules/ol/format/XML.js","./xsd.js":"../node_modules/ol/format/xsd.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/geom/flat/flip.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.flipXY = flipXY;
+
+/**
+ * @module ol/geom/flat/flip
+ */
+
+/**
+ * @param {Array<number>} flatCoordinates Flat coordinates.
+ * @param {number} offset Offset.
+ * @param {number} end End.
+ * @param {number} stride Stride.
+ * @param {Array<number>=} opt_dest Destination.
+ * @param {number=} opt_destOffset Destination offset.
+ * @return {Array<number>} Flat coordinates.
+ */
+function flipXY(flatCoordinates, offset, end, stride, opt_dest, opt_destOffset) {
+  var dest, destOffset;
+
+  if (opt_dest !== undefined) {
+    dest = opt_dest;
+    destOffset = opt_destOffset !== undefined ? opt_destOffset : 0;
+  } else {
+    dest = [];
+    destOffset = 0;
+  }
+
+  var j = offset;
+
+  while (j < end) {
+    var x = flatCoordinates[j++];
+    dest[destOffset++] = flatCoordinates[j++];
+    dest[destOffset++] = x;
+
+    for (var k = 2; k < stride; ++k) {
+      dest[destOffset++] = flatCoordinates[j++];
+    }
+  }
+
+  dest.length = destOffset;
+  return dest;
+}
+},{}],"../node_modules/ol/format/Polyline.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.encodeDeltas = encodeDeltas;
+exports.decodeDeltas = decodeDeltas;
+exports.encodeFloats = encodeFloats;
+exports.decodeFloats = decodeFloats;
+exports.encodeSignedIntegers = encodeSignedIntegers;
+exports.decodeSignedIntegers = decodeSignedIntegers;
+exports.encodeUnsignedIntegers = encodeUnsignedIntegers;
+exports.decodeUnsignedIntegers = decodeUnsignedIntegers;
+exports.encodeUnsignedInteger = encodeUnsignedInteger;
+exports.default = void 0;
+
+var _asserts = require("../asserts.js");
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _Feature2 = require("./Feature.js");
+
+var _TextFeature = _interopRequireDefault(require("./TextFeature.js"));
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _SimpleGeometry = require("../geom/SimpleGeometry.js");
+
+var _flip = require("../geom/flat/flip.js");
+
+var _inflate = require("../geom/flat/inflate.js");
+
+var _proj = require("../proj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/Polyline
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {number} [factor=1e5] The factor by which the coordinates values will be scaled.
+ * @property {GeometryLayout} [geometryLayout='XY'] Layout of the
+ * feature geometries created by the format reader.
+ */
+
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the Encoded
+ * Polyline Algorithm Format.
+ *
+ * When reading features, the coordinates are assumed to be in two dimensions
+ * and in [latitude, longitude] order.
+ *
+ * As Polyline sources contain a single feature,
+ * {@link module:ol/format/Polyline~Polyline#readFeatures} will return the
+ * feature in an array.
+ *
+ * @api
+ */
+var Polyline =
+/*@__PURE__*/
+function (TextFeature) {
+  function Polyline(opt_options) {
+    TextFeature.call(this);
+    var options = opt_options ? opt_options : {};
+    /**
+     * @inheritDoc
+     */
+
+    this.dataProjection = (0, _proj.get)('EPSG:4326');
+    /**
+     * @private
+     * @type {number}
+     */
+
+    this.factor_ = options.factor ? options.factor : 1e5;
+    /**
+     * @private
+     * @type {GeometryLayout}
+     */
+
+    this.geometryLayout_ = options.geometryLayout ? options.geometryLayout : _GeometryLayout.default.XY;
+  }
+
+  if (TextFeature) Polyline.__proto__ = TextFeature;
+  Polyline.prototype = Object.create(TextFeature && TextFeature.prototype);
+  Polyline.prototype.constructor = Polyline;
+  /**
+   * @inheritDoc
+   */
+
+  Polyline.prototype.readFeatureFromText = function readFeatureFromText(text, opt_options) {
+    var geometry = this.readGeometryFromText(text, opt_options);
+    return new _Feature.default(geometry);
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  Polyline.prototype.readFeaturesFromText = function readFeaturesFromText(text, opt_options) {
+    var feature = this.readFeatureFromText(text, opt_options);
+    return [feature];
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  Polyline.prototype.readGeometryFromText = function readGeometryFromText(text, opt_options) {
+    var stride = (0, _SimpleGeometry.getStrideForLayout)(this.geometryLayout_);
+    var flatCoordinates = decodeDeltas(text, stride, this.factor_);
+    (0, _flip.flipXY)(flatCoordinates, 0, flatCoordinates.length, stride, flatCoordinates);
+    var coordinates = (0, _inflate.inflateCoordinates)(flatCoordinates, 0, flatCoordinates.length, stride);
+    return (
+      /** @type {import("../geom/Geometry.js").default} */
+      (0, _Feature2.transformWithOptions)(new _LineString.default(coordinates, this.geometryLayout_), false, this.adaptOptions(opt_options))
+    );
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  Polyline.prototype.writeFeatureText = function writeFeatureText(feature, opt_options) {
+    var geometry = feature.getGeometry();
+
+    if (geometry) {
+      return this.writeGeometryText(geometry, opt_options);
+    } else {
+      (0, _asserts.assert)(false, 40); // Expected `feature` to have a geometry
+
+      return '';
+    }
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  Polyline.prototype.writeFeaturesText = function writeFeaturesText(features, opt_options) {
+    return this.writeFeatureText(features[0], opt_options);
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  Polyline.prototype.writeGeometryText = function writeGeometryText(geometry, opt_options) {
+    geometry =
+    /** @type {LineString} */
+    (0, _Feature2.transformWithOptions)(geometry, true, this.adaptOptions(opt_options));
+    var flatCoordinates = geometry.getFlatCoordinates();
+    var stride = geometry.getStride();
+    (0, _flip.flipXY)(flatCoordinates, 0, flatCoordinates.length, stride, flatCoordinates);
+    return encodeDeltas(flatCoordinates, stride, this.factor_);
+  };
+
+  return Polyline;
+}(_TextFeature.default);
+/**
+ * Encode a list of n-dimensional points and return an encoded string
+ *
+ * Attention: This function will modify the passed array!
+ *
+ * @param {Array<number>} numbers A list of n-dimensional points.
+ * @param {number} stride The number of dimension of the points in the list.
+ * @param {number=} opt_factor The factor by which the numbers will be
+ *     multiplied. The remaining decimal places will get rounded away.
+ *     Default is `1e5`.
+ * @return {string} The encoded string.
+ * @api
+ */
+
+
+function encodeDeltas(numbers, stride, opt_factor) {
+  var factor = opt_factor ? opt_factor : 1e5;
+  var d;
+  var lastNumbers = new Array(stride);
+
+  for (d = 0; d < stride; ++d) {
+    lastNumbers[d] = 0;
+  }
+
+  for (var i = 0, ii = numbers.length; i < ii;) {
+    for (d = 0; d < stride; ++d, ++i) {
+      var num = numbers[i];
+      var delta = num - lastNumbers[d];
+      lastNumbers[d] = num;
+      numbers[i] = delta;
+    }
+  }
+
+  return encodeFloats(numbers, factor);
+}
+/**
+ * Decode a list of n-dimensional points from an encoded string
+ *
+ * @param {string} encoded An encoded string.
+ * @param {number} stride The number of dimension of the points in the
+ *     encoded string.
+ * @param {number=} opt_factor The factor by which the resulting numbers will
+ *     be divided. Default is `1e5`.
+ * @return {Array<number>} A list of n-dimensional points.
+ * @api
+ */
+
+
+function decodeDeltas(encoded, stride, opt_factor) {
+  var factor = opt_factor ? opt_factor : 1e5;
+  var d;
+  /** @type {Array<number>} */
+
+  var lastNumbers = new Array(stride);
+
+  for (d = 0; d < stride; ++d) {
+    lastNumbers[d] = 0;
+  }
+
+  var numbers = decodeFloats(encoded, factor);
+
+  for (var i = 0, ii = numbers.length; i < ii;) {
+    for (d = 0; d < stride; ++d, ++i) {
+      lastNumbers[d] += numbers[i];
+      numbers[i] = lastNumbers[d];
+    }
+  }
+
+  return numbers;
+}
+/**
+ * Encode a list of floating point numbers and return an encoded string
+ *
+ * Attention: This function will modify the passed array!
+ *
+ * @param {Array<number>} numbers A list of floating point numbers.
+ * @param {number=} opt_factor The factor by which the numbers will be
+ *     multiplied. The remaining decimal places will get rounded away.
+ *     Default is `1e5`.
+ * @return {string} The encoded string.
+ * @api
+ */
+
+
+function encodeFloats(numbers, opt_factor) {
+  var factor = opt_factor ? opt_factor : 1e5;
+
+  for (var i = 0, ii = numbers.length; i < ii; ++i) {
+    numbers[i] = Math.round(numbers[i] * factor);
+  }
+
+  return encodeSignedIntegers(numbers);
+}
+/**
+ * Decode a list of floating point numbers from an encoded string
+ *
+ * @param {string} encoded An encoded string.
+ * @param {number=} opt_factor The factor by which the result will be divided.
+ *     Default is `1e5`.
+ * @return {Array<number>} A list of floating point numbers.
+ * @api
+ */
+
+
+function decodeFloats(encoded, opt_factor) {
+  var factor = opt_factor ? opt_factor : 1e5;
+  var numbers = decodeSignedIntegers(encoded);
+
+  for (var i = 0, ii = numbers.length; i < ii; ++i) {
+    numbers[i] /= factor;
+  }
+
+  return numbers;
+}
+/**
+ * Encode a list of signed integers and return an encoded string
+ *
+ * Attention: This function will modify the passed array!
+ *
+ * @param {Array<number>} numbers A list of signed integers.
+ * @return {string} The encoded string.
+ */
+
+
+function encodeSignedIntegers(numbers) {
+  for (var i = 0, ii = numbers.length; i < ii; ++i) {
+    var num = numbers[i];
+    numbers[i] = num < 0 ? ~(num << 1) : num << 1;
+  }
+
+  return encodeUnsignedIntegers(numbers);
+}
+/**
+ * Decode a list of signed integers from an encoded string
+ *
+ * @param {string} encoded An encoded string.
+ * @return {Array<number>} A list of signed integers.
+ */
+
+
+function decodeSignedIntegers(encoded) {
+  var numbers = decodeUnsignedIntegers(encoded);
+
+  for (var i = 0, ii = numbers.length; i < ii; ++i) {
+    var num = numbers[i];
+    numbers[i] = num & 1 ? ~(num >> 1) : num >> 1;
+  }
+
+  return numbers;
+}
+/**
+ * Encode a list of unsigned integers and return an encoded string
+ *
+ * @param {Array<number>} numbers A list of unsigned integers.
+ * @return {string} The encoded string.
+ */
+
+
+function encodeUnsignedIntegers(numbers) {
+  var encoded = '';
+
+  for (var i = 0, ii = numbers.length; i < ii; ++i) {
+    encoded += encodeUnsignedInteger(numbers[i]);
+  }
+
+  return encoded;
+}
+/**
+ * Decode a list of unsigned integers from an encoded string
+ *
+ * @param {string} encoded An encoded string.
+ * @return {Array<number>} A list of unsigned integers.
+ */
+
+
+function decodeUnsignedIntegers(encoded) {
+  var numbers = [];
+  var current = 0;
+  var shift = 0;
+
+  for (var i = 0, ii = encoded.length; i < ii; ++i) {
+    var b = encoded.charCodeAt(i) - 63;
+    current |= (b & 0x1f) << shift;
+
+    if (b < 0x20) {
+      numbers.push(current);
+      current = 0;
+      shift = 0;
+    } else {
+      shift += 5;
+    }
+  }
+
+  return numbers;
+}
+/**
+ * Encode one single unsigned integer and return an encoded string
+ *
+ * @param {number} num Unsigned integer that should be encoded.
+ * @return {string} The encoded string.
+ */
+
+
+function encodeUnsignedInteger(num) {
+  var value,
+      encoded = '';
+
+  while (num >= 0x20) {
+    value = (0x20 | num & 0x1f) + 63;
+    encoded += String.fromCharCode(value);
+    num >>= 5;
+  }
+
+  value = num + 63;
+  encoded += String.fromCharCode(value);
+  return encoded;
+}
+
+var _default = Polyline;
+exports.default = _default;
+},{"../asserts.js":"../node_modules/ol/asserts.js","../Feature.js":"../node_modules/ol/Feature.js","./Feature.js":"../node_modules/ol/format/Feature.js","./TextFeature.js":"../node_modules/ol/format/TextFeature.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/SimpleGeometry.js":"../node_modules/ol/geom/SimpleGeometry.js","../geom/flat/flip.js":"../node_modules/ol/geom/flat/flip.js","../geom/flat/inflate.js":"../node_modules/ol/geom/flat/inflate.js","../proj.js":"../node_modules/ol/proj.js"}],"../node_modules/ol/format/TopoJSON.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _Feature2 = require("./Feature.js");
+
+var _JSONFeature = _interopRequireDefault(require("./JSONFeature.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _MultiPoint = _interopRequireDefault(require("../geom/MultiPoint.js"));
+
+var _MultiPolygon = _interopRequireDefault(require("../geom/MultiPolygon.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _Polygon = _interopRequireDefault(require("../geom/Polygon.js"));
+
+var _proj = require("../proj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/TopoJSON
+ */
+
+/**
+ * @typedef {import("topojson-specification").Topology} TopoJSONTopology
+ * @typedef {import("topojson-specification").GeometryCollection} TopoJSONGeometryCollection
+ * @typedef {import("topojson-specification").GeometryObject} TopoJSONGeometry
+ * @typedef {import("topojson-specification").Point} TopoJSONPoint
+ * @typedef {import("topojson-specification").MultiPoint} TopoJSONMultiPoint
+ * @typedef {import("topojson-specification").LineString} TopoJSONLineString
+ * @typedef {import("topojson-specification").MultiLineString} TopoJSONMultiLineString
+ * @typedef {import("topojson-specification").Polygon} TopoJSONPolygon
+ * @typedef {import("topojson-specification").MultiPolygon} TopoJSONMultiPolygon
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {import("../proj.js").ProjectionLike} [dataProjection='EPSG:4326'] Default data projection.
+ * @property {string} [layerName] Set the name of the TopoJSON topology
+ * `objects`'s children as feature property with the specified name. This means
+ * that when set to `'layer'`, a topology like
+ * ```
+ * {
+ *   "type": "Topology",
+ *   "objects": {
+ *     "example": {
+ *       "type": "GeometryCollection",
+ *       "geometries": []
+ *     }
+ *   }
+ * }
+ * ```
+ * will result in features that have a property `'layer'` set to `'example'`.
+ * When not set, no property will be added to features.
+ * @property {Array<string>} [layers] Names of the TopoJSON topology's
+ * `objects`'s children to read features from.  If not provided, features will
+ * be read from all children.
+ */
+
+/**
+ * @classdesc
+ * Feature format for reading data in the TopoJSON format.
+ *
+ * @api
+ */
+var TopoJSON =
+/*@__PURE__*/
+function (JSONFeature) {
+  function TopoJSON(opt_options) {
+    JSONFeature.call(this);
+    var options = opt_options ? opt_options : {};
+    /**
+     * @private
+     * @type {string|undefined}
+     */
+
+    this.layerName_ = options.layerName;
+    /**
+     * @private
+     * @type {Array<string>}
+     */
+
+    this.layers_ = options.layers ? options.layers : null;
+    /**
+     * @inheritDoc
+     */
+
+    this.dataProjection = (0, _proj.get)(options.dataProjection ? options.dataProjection : 'EPSG:4326');
+  }
+
+  if (JSONFeature) TopoJSON.__proto__ = JSONFeature;
+  TopoJSON.prototype = Object.create(JSONFeature && JSONFeature.prototype);
+  TopoJSON.prototype.constructor = TopoJSON;
+  /**
+   * @inheritDoc
+   */
+
+  TopoJSON.prototype.readFeaturesFromObject = function readFeaturesFromObject(object, opt_options) {
+    if (object.type == 'Topology') {
+      var topoJSONTopology =
+      /** @type {TopoJSONTopology} */
+      object;
+      var transform,
+          scale = null,
+          translate = null;
+
+      if (topoJSONTopology['transform']) {
+        transform = topoJSONTopology['transform'];
+        scale = transform['scale'];
+        translate = transform['translate'];
+      }
+
+      var arcs = topoJSONTopology['arcs'];
+
+      if (transform) {
+        transformArcs(arcs, scale, translate);
+      }
+      /** @type {Array<Feature>} */
+
+
+      var features = [];
+      var topoJSONFeatures = topoJSONTopology['objects'];
+      var property = this.layerName_;
+      var feature;
+
+      for (var objectName in topoJSONFeatures) {
+        if (this.layers_ && this.layers_.indexOf(objectName) == -1) {
+          continue;
+        }
+
+        if (topoJSONFeatures[objectName].type === 'GeometryCollection') {
+          feature =
+          /** @type {TopoJSONGeometryCollection} */
+          topoJSONFeatures[objectName];
+          features.push.apply(features, readFeaturesFromGeometryCollection(feature, arcs, scale, translate, property, objectName, opt_options));
+        } else {
+          feature =
+          /** @type {TopoJSONGeometry} */
+          topoJSONFeatures[objectName];
+          features.push(readFeatureFromGeometry(feature, arcs, scale, translate, property, objectName, opt_options));
+        }
+      }
+
+      return features;
+    } else {
+      return [];
+    }
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  TopoJSON.prototype.readProjectionFromObject = function readProjectionFromObject(object) {
+    return this.dataProjection;
+  };
+
+  return TopoJSON;
+}(_JSONFeature.default);
+/**
+ * @const
+ * @type {Object<string, function(TopoJSONGeometry, Array, ...Array=): import("../geom/Geometry.js").default>}
+ */
+
+
+var GEOMETRY_READERS = {
+  'Point': readPointGeometry,
+  'LineString': readLineStringGeometry,
+  'Polygon': readPolygonGeometry,
+  'MultiPoint': readMultiPointGeometry,
+  'MultiLineString': readMultiLineStringGeometry,
+  'MultiPolygon': readMultiPolygonGeometry
+};
+/**
+ * Concatenate arcs into a coordinate array.
+ * @param {Array<number>} indices Indices of arcs to concatenate.  Negative
+ *     values indicate arcs need to be reversed.
+ * @param {Array<Array<import("../coordinate.js").Coordinate>>} arcs Array of arcs (already
+ *     transformed).
+ * @return {Array<import("../coordinate.js").Coordinate>} Coordinates array.
+ */
+
+function concatenateArcs(indices, arcs) {
+  /** @type {Array<import("../coordinate.js").Coordinate>} */
+  var coordinates = [];
+  var index, arc;
+
+  for (var i = 0, ii = indices.length; i < ii; ++i) {
+    index = indices[i];
+
+    if (i > 0) {
+      // splicing together arcs, discard last point
+      coordinates.pop();
+    }
+
+    if (index >= 0) {
+      // forward arc
+      arc = arcs[index];
+    } else {
+      // reverse arc
+      arc = arcs[~index].slice().reverse();
+    }
+
+    coordinates.push.apply(coordinates, arc);
+  } // provide fresh copies of coordinate arrays
+
+
+  for (var j = 0, jj = coordinates.length; j < jj; ++j) {
+    coordinates[j] = coordinates[j].slice();
+  }
+
+  return coordinates;
+}
+/**
+ * Create a point from a TopoJSON geometry object.
+ *
+ * @param {TopoJSONPoint} object TopoJSON object.
+ * @param {Array<number>} scale Scale for each dimension.
+ * @param {Array<number>} translate Translation for each dimension.
+ * @return {Point} Geometry.
+ */
+
+
+function readPointGeometry(object, scale, translate) {
+  var coordinates = object['coordinates'];
+
+  if (scale && translate) {
+    transformVertex(coordinates, scale, translate);
+  }
+
+  return new _Point.default(coordinates);
+}
+/**
+ * Create a multi-point from a TopoJSON geometry object.
+ *
+ * @param {TopoJSONMultiPoint} object TopoJSON object.
+ * @param {Array<number>} scale Scale for each dimension.
+ * @param {Array<number>} translate Translation for each dimension.
+ * @return {MultiPoint} Geometry.
+ */
+
+
+function readMultiPointGeometry(object, scale, translate) {
+  var coordinates = object['coordinates'];
+
+  if (scale && translate) {
+    for (var i = 0, ii = coordinates.length; i < ii; ++i) {
+      transformVertex(coordinates[i], scale, translate);
+    }
+  }
+
+  return new _MultiPoint.default(coordinates);
+}
+/**
+ * Create a linestring from a TopoJSON geometry object.
+ *
+ * @param {TopoJSONLineString} object TopoJSON object.
+ * @param {Array<Array<import("../coordinate.js").Coordinate>>} arcs Array of arcs.
+ * @return {LineString} Geometry.
+ */
+
+
+function readLineStringGeometry(object, arcs) {
+  var coordinates = concatenateArcs(object['arcs'], arcs);
+  return new _LineString.default(coordinates);
+}
+/**
+ * Create a multi-linestring from a TopoJSON geometry object.
+ *
+ * @param {TopoJSONMultiLineString} object TopoJSON object.
+ * @param {Array<Array<import("../coordinate.js").Coordinate>>} arcs Array of arcs.
+ * @return {MultiLineString} Geometry.
+ */
+
+
+function readMultiLineStringGeometry(object, arcs) {
+  var coordinates = [];
+
+  for (var i = 0, ii = object['arcs'].length; i < ii; ++i) {
+    coordinates[i] = concatenateArcs(object['arcs'][i], arcs);
+  }
+
+  return new _MultiLineString.default(coordinates);
+}
+/**
+ * Create a polygon from a TopoJSON geometry object.
+ *
+ * @param {TopoJSONPolygon} object TopoJSON object.
+ * @param {Array<Array<import("../coordinate.js").Coordinate>>} arcs Array of arcs.
+ * @return {Polygon} Geometry.
+ */
+
+
+function readPolygonGeometry(object, arcs) {
+  var coordinates = [];
+
+  for (var i = 0, ii = object['arcs'].length; i < ii; ++i) {
+    coordinates[i] = concatenateArcs(object['arcs'][i], arcs);
+  }
+
+  return new _Polygon.default(coordinates);
+}
+/**
+ * Create a multi-polygon from a TopoJSON geometry object.
+ *
+ * @param {TopoJSONMultiPolygon} object TopoJSON object.
+ * @param {Array<Array<import("../coordinate.js").Coordinate>>} arcs Array of arcs.
+ * @return {MultiPolygon} Geometry.
+ */
+
+
+function readMultiPolygonGeometry(object, arcs) {
+  var coordinates = [];
+
+  for (var i = 0, ii = object['arcs'].length; i < ii; ++i) {
+    // for each polygon
+    var polyArray = object['arcs'][i];
+    var ringCoords = [];
+
+    for (var j = 0, jj = polyArray.length; j < jj; ++j) {
+      // for each ring
+      ringCoords[j] = concatenateArcs(polyArray[j], arcs);
+    }
+
+    coordinates[i] = ringCoords;
+  }
+
+  return new _MultiPolygon.default(coordinates);
+}
+/**
+ * Create features from a TopoJSON GeometryCollection object.
+ *
+ * @param {TopoJSONGeometryCollection} collection TopoJSON Geometry
+ *     object.
+ * @param {Array<Array<import("../coordinate.js").Coordinate>>} arcs Array of arcs.
+ * @param {Array<number>} scale Scale for each dimension.
+ * @param {Array<number>} translate Translation for each dimension.
+ * @param {string|undefined} property Property to set the `GeometryCollection`'s parent
+ *     object to.
+ * @param {string} name Name of the `Topology`'s child object.
+ * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+ * @return {Array<Feature>} Array of features.
+ */
+
+
+function readFeaturesFromGeometryCollection(collection, arcs, scale, translate, property, name, opt_options) {
+  var geometries = collection['geometries'];
+  var features = [];
+
+  for (var i = 0, ii = geometries.length; i < ii; ++i) {
+    features[i] = readFeatureFromGeometry(geometries[i], arcs, scale, translate, property, name, opt_options);
+  }
+
+  return features;
+}
+/**
+ * Create a feature from a TopoJSON geometry object.
+ *
+ * @param {TopoJSONGeometry} object TopoJSON geometry object.
+ * @param {Array<Array<import("../coordinate.js").Coordinate>>} arcs Array of arcs.
+ * @param {Array<number>} scale Scale for each dimension.
+ * @param {Array<number>} translate Translation for each dimension.
+ * @param {string|undefined} property Property to set the `GeometryCollection`'s parent
+ *     object to.
+ * @param {string} name Name of the `Topology`'s child object.
+ * @param {import("./Feature.js").ReadOptions=} opt_options Read options.
+ * @return {Feature} Feature.
+ */
+
+
+function readFeatureFromGeometry(object, arcs, scale, translate, property, name, opt_options) {
+  var geometry;
+  var type = object.type;
+  var geometryReader = GEOMETRY_READERS[type];
+
+  if (type === 'Point' || type === 'MultiPoint') {
+    geometry = geometryReader(object, scale, translate);
+  } else {
+    geometry = geometryReader(object, arcs);
+  }
+
+  var feature = new _Feature.default();
+  feature.setGeometry(
+  /** @type {import("../geom/Geometry.js").default} */
+  (0, _Feature2.transformWithOptions)(geometry, false, opt_options));
+
+  if (object.id !== undefined) {
+    feature.setId(object.id);
+  }
+
+  var properties = object.properties;
+
+  if (property) {
+    if (!properties) {
+      properties = {};
+    }
+
+    properties[property] = name;
+  }
+
+  if (properties) {
+    feature.setProperties(properties);
+  }
+
+  return feature;
+}
+/**
+ * Apply a linear transform to array of arcs.  The provided array of arcs is
+ * modified in place.
+ *
+ * @param {Array<Array<import("../coordinate.js").Coordinate>>} arcs Array of arcs.
+ * @param {Array<number>} scale Scale for each dimension.
+ * @param {Array<number>} translate Translation for each dimension.
+ */
+
+
+function transformArcs(arcs, scale, translate) {
+  for (var i = 0, ii = arcs.length; i < ii; ++i) {
+    transformArc(arcs[i], scale, translate);
+  }
+}
+/**
+ * Apply a linear transform to an arc.  The provided arc is modified in place.
+ *
+ * @param {Array<import("../coordinate.js").Coordinate>} arc Arc.
+ * @param {Array<number>} scale Scale for each dimension.
+ * @param {Array<number>} translate Translation for each dimension.
+ */
+
+
+function transformArc(arc, scale, translate) {
+  var x = 0;
+  var y = 0;
+
+  for (var i = 0, ii = arc.length; i < ii; ++i) {
+    var vertex = arc[i];
+    x += vertex[0];
+    y += vertex[1];
+    vertex[0] = x;
+    vertex[1] = y;
+    transformVertex(vertex, scale, translate);
+  }
+}
+/**
+ * Apply a linear transform to a vertex.  The provided vertex is modified in
+ * place.
+ *
+ * @param {import("../coordinate.js").Coordinate} vertex Vertex.
+ * @param {Array<number>} scale Scale for each dimension.
+ * @param {Array<number>} translate Translation for each dimension.
+ */
+
+
+function transformVertex(vertex, scale, translate) {
+  vertex[0] = vertex[0] * scale[0] + translate[0];
+  vertex[1] = vertex[1] * scale[1] + translate[1];
+}
+
+var _default = TopoJSON;
+exports.default = _default;
+},{"../Feature.js":"../node_modules/ol/Feature.js","./Feature.js":"../node_modules/ol/format/Feature.js","./JSONFeature.js":"../node_modules/ol/format/JSONFeature.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/MultiPoint.js":"../node_modules/ol/geom/MultiPoint.js","../geom/MultiPolygon.js":"../node_modules/ol/geom/MultiPolygon.js","../geom/Point.js":"../node_modules/ol/geom/Point.js","../geom/Polygon.js":"../node_modules/ol/geom/Polygon.js","../proj.js":"../node_modules/ol/proj.js"}],"../node_modules/ol/format/GML2.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _extent = require("../extent.js");
+
+var _Feature = require("./Feature.js");
+
+var _GMLBase = _interopRequireWildcard(require("./GMLBase.js"));
+
+var _xsd = require("./xsd.js");
+
+var _obj = require("../obj.js");
+
+var _proj = require("../proj.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = Object.defineProperty && Object.getOwnPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : {}; if (desc.get || desc.set) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } } newObj.default = obj; return newObj; } }
+
+/**
+ * @module ol/format/GML2
+ */
+
+/**
+ * @const
+ * @type {string}
+ */
+var schemaLocation = _GMLBase.GMLNS + ' http://schemas.opengis.net/gml/2.1.2/feature.xsd';
+/**
+ * @const
+ * @type {Object<string, string>}
+ */
+
+var MULTIGEOMETRY_TO_MEMBER_NODENAME = {
+  'MultiLineString': 'lineStringMember',
+  'MultiCurve': 'curveMember',
+  'MultiPolygon': 'polygonMember',
+  'MultiSurface': 'surfaceMember'
+};
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the GML format,
+ * version 2.1.2.
+ *
+ * @api
+ */
+
+var GML2 =
+/*@__PURE__*/
+function (GMLBase) {
+  function GML2(opt_options) {
+    var options =
+    /** @type {import("./GMLBase.js").Options} */
+    opt_options ? opt_options : {};
+    GMLBase.call(this, options);
+    this.FEATURE_COLLECTION_PARSERS[_GMLBase.GMLNS]['featureMember'] = (0, _xml.makeArrayPusher)(this.readFeaturesInternal);
+    /**
+     * @inheritDoc
+     */
+
+    this.schemaLocation = options.schemaLocation ? options.schemaLocation : schemaLocation;
+  }
+
+  if (GMLBase) GML2.__proto__ = GMLBase;
+  GML2.prototype = Object.create(GMLBase && GMLBase.prototype);
+  GML2.prototype.constructor = GML2;
+  /**
+   * @param {Node} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {Array<number>|undefined} Flat coordinates.
+   */
+
+  GML2.prototype.readFlatCoordinates_ = function readFlatCoordinates_(node, objectStack) {
+    var s = (0, _xml.getAllTextContent)(node, false).replace(/^\s*|\s*$/g, '');
+    var context =
+    /** @type {import("../xml.js").NodeStackItem} */
+    objectStack[0];
+    var containerSrs = context['srsName'];
+    var axisOrientation = 'enu';
+
+    if (containerSrs) {
+      var proj = (0, _proj.get)(containerSrs);
+
+      if (proj) {
+        axisOrientation = proj.getAxisOrientation();
+      }
+    }
+
+    var coordsGroups = s.trim().split(/\s+/);
+    var flatCoordinates = [];
+
+    for (var i = 0, ii = coordsGroups.length; i < ii; i++) {
+      var coords = coordsGroups[i].split(/,+/);
+      var x = parseFloat(coords[0]);
+      var y = parseFloat(coords[1]);
+      var z = coords.length === 3 ? parseFloat(coords[2]) : 0;
+
+      if (axisOrientation.substr(0, 2) === 'en') {
+        flatCoordinates.push(x, y, z);
+      } else {
+        flatCoordinates.push(y, x, z);
+      }
+    }
+
+    return flatCoordinates;
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   * @return {import("../extent.js").Extent|undefined} Envelope.
+   */
+
+
+  GML2.prototype.readBox_ = function readBox_(node, objectStack) {
+    /** @type {Array<number>} */
+    var flatCoordinates = (0, _xml.pushParseAndPop)([null], this.BOX_PARSERS_, node, objectStack, this);
+    return (0, _extent.createOrUpdate)(flatCoordinates[1][0], flatCoordinates[1][1], flatCoordinates[1][3], flatCoordinates[1][4]);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GML2.prototype.innerBoundaryIsParser_ = function innerBoundaryIsParser_(node, objectStack) {
+    /** @type {Array<number>|undefined} */
+    var flatLinearRing = (0, _xml.pushParseAndPop)(undefined, this.RING_PARSERS, node, objectStack, this);
+
+    if (flatLinearRing) {
+      var flatLinearRings =
+      /** @type {Array<Array<number>>} */
+      objectStack[objectStack.length - 1];
+      flatLinearRings.push(flatLinearRing);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @private
+   */
+
+
+  GML2.prototype.outerBoundaryIsParser_ = function outerBoundaryIsParser_(node, objectStack) {
+    /** @type {Array<number>|undefined} */
+    var flatLinearRing = (0, _xml.pushParseAndPop)(undefined, this.RING_PARSERS, node, objectStack, this);
+
+    if (flatLinearRing) {
+      var flatLinearRings =
+      /** @type {Array<Array<number>>} */
+      objectStack[objectStack.length - 1];
+      flatLinearRings[0] = flatLinearRing;
+    }
+  };
+  /**
+   * @const
+   * @param {*} value Value.
+   * @param {Array<*>} objectStack Object stack.
+   * @param {string=} opt_nodeName Node name.
+   * @return {Element|undefined} Node.
+   * @private
+   */
+
+
+  GML2.prototype.GEOMETRY_NODE_FACTORY_ = function GEOMETRY_NODE_FACTORY_(value, objectStack, opt_nodeName) {
+    var context = objectStack[objectStack.length - 1];
+    var multiSurface = context['multiSurface'];
+    var surface = context['surface'];
+    var multiCurve = context['multiCurve'];
+    var nodeName;
+
+    if (!Array.isArray(value)) {
+      nodeName =
+      /** @type {import("../geom/Geometry.js").default} */
+      value.getType();
+
+      if (nodeName === 'MultiPolygon' && multiSurface === true) {
+        nodeName = 'MultiSurface';
+      } else if (nodeName === 'Polygon' && surface === true) {
+        nodeName = 'Surface';
+      } else if (nodeName === 'MultiLineString' && multiCurve === true) {
+        nodeName = 'MultiCurve';
+      }
+    } else {
+      nodeName = 'Envelope';
+    }
+
+    return (0, _xml.createElementNS)('http://www.opengis.net/gml', nodeName);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../Feature.js").default} feature Feature.
+   * @param {Array<*>} objectStack Node stack.
+   */
+
+
+  GML2.prototype.writeFeatureElement = function writeFeatureElement(node, feature, objectStack) {
+    var fid = feature.getId();
+
+    if (fid) {
+      node.setAttribute('fid',
+      /** @type {string} */
+      fid);
+    }
+
+    var context =
+    /** @type {Object} */
+    objectStack[objectStack.length - 1];
+    var featureNS = context['featureNS'];
+    var geometryName = feature.getGeometryName();
+
+    if (!context.serializers) {
+      context.serializers = {};
+      context.serializers[featureNS] = {};
+    }
+
+    var properties = feature.getProperties();
+    var keys = [];
+    var values = [];
+
+    for (var key in properties) {
+      var value = properties[key];
+
+      if (value !== null) {
+        keys.push(key);
+        values.push(value);
+
+        if (key == geometryName || typeof
+        /** @type {?} */
+        value.getSimplifiedGeometry === 'function') {
+          if (!(key in context.serializers[featureNS])) {
+            context.serializers[featureNS][key] = (0, _xml.makeChildAppender)(this.writeGeometryElement, this);
+          }
+        } else {
+          if (!(key in context.serializers[featureNS])) {
+            context.serializers[featureNS][key] = (0, _xml.makeChildAppender)(_xsd.writeStringTextNode);
+          }
+        }
+      }
+    }
+
+    var item = (0, _obj.assign)({}, context);
+    item.node = node;
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    item, context.serializers, (0, _xml.makeSimpleNodeFactory)(undefined, featureNS), values, objectStack, keys);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/LineString.js").default} geometry LineString geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeCurveOrLineString_ = function writeCurveOrLineString_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var srsName = context['srsName'];
+
+    if (node.nodeName !== 'LineStringSegment' && srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    if (node.nodeName === 'LineString' || node.nodeName === 'LineStringSegment') {
+      var coordinates = this.createCoordinatesNode_(node.namespaceURI);
+      node.appendChild(coordinates);
+      this.writeCoordinates_(coordinates, geometry, objectStack);
+    } else if (node.nodeName === 'Curve') {
+      var segments = (0, _xml.createElementNS)(node.namespaceURI, 'segments');
+      node.appendChild(segments);
+      this.writeCurveSegments_(segments, geometry, objectStack);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/LineString.js").default} line LineString geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeLineStringOrCurveMember_ = function writeLineStringOrCurveMember_(node, line, objectStack) {
+    var child = this.GEOMETRY_NODE_FACTORY_(line, objectStack);
+
+    if (child) {
+      node.appendChild(child);
+      this.writeCurveOrLineString_(child, line, objectStack);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/MultiLineString.js").default} geometry MultiLineString geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeMultiCurveOrLineString_ = function writeMultiCurveOrLineString_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName'];
+    var curve = context['curve'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var lines = geometry.getLineStrings();
+    (0, _xml.pushSerializeAndPop)({
+      node: node,
+      hasZ: hasZ,
+      srsName: srsName,
+      curve: curve
+    }, this.LINESTRINGORCURVEMEMBER_SERIALIZERS_, this.MULTIGEOMETRY_MEMBER_NODE_FACTORY_, lines, objectStack, undefined, this);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/Geometry.js").default|import("../extent.js").Extent} geometry Geometry.
+   * @param {Array<*>} objectStack Node stack.
+   */
+
+
+  GML2.prototype.writeGeometryElement = function writeGeometryElement(node, geometry, objectStack) {
+    var context =
+    /** @type {import("./Feature.js").WriteOptions} */
+    objectStack[objectStack.length - 1];
+    var item = (0, _obj.assign)({}, context);
+    item['node'] = node;
+    var value;
+
+    if (Array.isArray(geometry)) {
+      if (context.dataProjection) {
+        value = (0, _proj.transformExtent)(geometry, context.featureProjection, context.dataProjection);
+      } else {
+        value = geometry;
+      }
+    } else {
+      value = (0, _Feature.transformWithOptions)(
+      /** @type {import("../geom/Geometry.js").default} */
+      geometry, true, context);
+    }
+
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    item, this.GEOMETRY_SERIALIZERS_, this.GEOMETRY_NODE_FACTORY_, [value], objectStack, undefined, this);
+  };
+  /**
+   * @param {string} namespaceURI XML namespace.
+   * @returns {Element} coordinates node.
+   * @private
+   */
+
+
+  GML2.prototype.createCoordinatesNode_ = function createCoordinatesNode_(namespaceURI) {
+    var coordinates = (0, _xml.createElementNS)(namespaceURI, 'coordinates');
+    coordinates.setAttribute('decimal', '.');
+    coordinates.setAttribute('cs', ',');
+    coordinates.setAttribute('ts', ' ');
+    return coordinates;
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/LineString.js").default|import("../geom/LinearRing.js").default} value Geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeCoordinates_ = function writeCoordinates_(node, value, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName']; // only 2d for simple features profile
+
+    var points = value.getCoordinates();
+    var len = points.length;
+    var parts = new Array(len);
+
+    for (var i = 0; i < len; ++i) {
+      var point = points[i];
+      parts[i] = this.getCoords_(point, srsName, hasZ);
+    }
+
+    (0, _xsd.writeStringTextNode)(node, parts.join(' '));
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/LineString.js").default} line LineString geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeCurveSegments_ = function writeCurveSegments_(node, line, objectStack) {
+    var child = (0, _xml.createElementNS)(node.namespaceURI, 'LineStringSegment');
+    node.appendChild(child);
+    this.writeCurveOrLineString_(child, line, objectStack);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/Polygon.js").default} geometry Polygon geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeSurfaceOrPolygon_ = function writeSurfaceOrPolygon_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName'];
+
+    if (node.nodeName !== 'PolygonPatch' && srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    if (node.nodeName === 'Polygon' || node.nodeName === 'PolygonPatch') {
+      var rings = geometry.getLinearRings();
+      (0, _xml.pushSerializeAndPop)({
+        node: node,
+        hasZ: hasZ,
+        srsName: srsName
+      }, this.RING_SERIALIZERS_, this.RING_NODE_FACTORY_, rings, objectStack, undefined, this);
+    } else if (node.nodeName === 'Surface') {
+      var patches = (0, _xml.createElementNS)(node.namespaceURI, 'patches');
+      node.appendChild(patches);
+      this.writeSurfacePatches_(patches, geometry, objectStack);
+    }
+  };
+  /**
+   * @param {*} value Value.
+   * @param {Array<*>} objectStack Object stack.
+   * @param {string=} opt_nodeName Node name.
+   * @return {Node} Node.
+   * @private
+   */
+
+
+  GML2.prototype.RING_NODE_FACTORY_ = function RING_NODE_FACTORY_(value, objectStack, opt_nodeName) {
+    var context = objectStack[objectStack.length - 1];
+    var parentNode = context.node;
+    var exteriorWritten = context['exteriorWritten'];
+
+    if (exteriorWritten === undefined) {
+      context['exteriorWritten'] = true;
+    }
+
+    return (0, _xml.createElementNS)(parentNode.namespaceURI, exteriorWritten !== undefined ? 'innerBoundaryIs' : 'outerBoundaryIs');
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/Polygon.js").default} polygon Polygon geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeSurfacePatches_ = function writeSurfacePatches_(node, polygon, objectStack) {
+    var child = (0, _xml.createElementNS)(node.namespaceURI, 'PolygonPatch');
+    node.appendChild(child);
+    this.writeSurfaceOrPolygon_(child, polygon, objectStack);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/LinearRing.js").default} ring LinearRing geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeRing_ = function writeRing_(node, ring, objectStack) {
+    var linearRing = (0, _xml.createElementNS)(node.namespaceURI, 'LinearRing');
+    node.appendChild(linearRing);
+    this.writeLinearRing_(linearRing, ring, objectStack);
+  };
+  /**
+   * @param {Array<number>} point Point geometry.
+   * @param {string=} opt_srsName Optional srsName
+   * @param {boolean=} opt_hasZ whether the geometry has a Z coordinate (is 3D) or not.
+   * @return {string} The coords string.
+   * @private
+   */
+
+
+  GML2.prototype.getCoords_ = function getCoords_(point, opt_srsName, opt_hasZ) {
+    var axisOrientation = 'enu';
+
+    if (opt_srsName) {
+      axisOrientation = (0, _proj.get)(opt_srsName).getAxisOrientation();
+    }
+
+    var coords = axisOrientation.substr(0, 2) === 'en' ? point[0] + ',' + point[1] : point[1] + ',' + point[0];
+
+    if (opt_hasZ) {
+      // For newly created points, Z can be undefined.
+      var z = point[2] || 0;
+      coords += ',' + z;
+    }
+
+    return coords;
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/Point.js").default} geometry Point geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writePoint_ = function writePoint_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var coordinates = this.createCoordinatesNode_(node.namespaceURI);
+    node.appendChild(coordinates);
+    var point = geometry.getCoordinates();
+    var coord = this.getCoords_(point, srsName, hasZ);
+    (0, _xsd.writeStringTextNode)(coordinates, coord);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/MultiPoint.js").default} geometry MultiPoint geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeMultiPoint_ = function writeMultiPoint_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var points = geometry.getPoints();
+    (0, _xml.pushSerializeAndPop)({
+      node: node,
+      hasZ: hasZ,
+      srsName: srsName
+    }, this.POINTMEMBER_SERIALIZERS_, (0, _xml.makeSimpleNodeFactory)('pointMember'), points, objectStack, undefined, this);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/Point.js").default} point Point geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writePointMember_ = function writePointMember_(node, point, objectStack) {
+    var child = (0, _xml.createElementNS)(node.namespaceURI, 'Point');
+    node.appendChild(child);
+    this.writePoint_(child, point, objectStack);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/LinearRing.js").default} geometry LinearRing geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeLinearRing_ = function writeLinearRing_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var srsName = context['srsName'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var coordinates = this.createCoordinatesNode_(node.namespaceURI);
+    node.appendChild(coordinates);
+    this.writeCoordinates_(coordinates, geometry, objectStack);
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../geom/MultiPolygon.js").default} geometry MultiPolygon geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeMultiSurfaceOrPolygon_ = function writeMultiSurfaceOrPolygon_(node, geometry, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var hasZ = context['hasZ'];
+    var srsName = context['srsName'];
+    var surface = context['surface'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var polygons = geometry.getPolygons();
+    (0, _xml.pushSerializeAndPop)({
+      node: node,
+      hasZ: hasZ,
+      srsName: srsName,
+      surface: surface
+    }, this.SURFACEORPOLYGONMEMBER_SERIALIZERS_, this.MULTIGEOMETRY_MEMBER_NODE_FACTORY_, polygons, objectStack, undefined, this);
+  };
+  /**
+   * @param {Node} node Node.
+   * @param {import("../geom/Polygon.js").default} polygon Polygon geometry.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeSurfaceOrPolygonMember_ = function writeSurfaceOrPolygonMember_(node, polygon, objectStack) {
+    var child = this.GEOMETRY_NODE_FACTORY_(polygon, objectStack);
+
+    if (child) {
+      node.appendChild(child);
+      this.writeSurfaceOrPolygon_(child, polygon, objectStack);
+    }
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {import("../extent.js").Extent} extent Extent.
+   * @param {Array<*>} objectStack Node stack.
+   * @private
+   */
+
+
+  GML2.prototype.writeEnvelope = function writeEnvelope(node, extent, objectStack) {
+    var context = objectStack[objectStack.length - 1];
+    var srsName = context['srsName'];
+
+    if (srsName) {
+      node.setAttribute('srsName', srsName);
+    }
+
+    var keys = ['lowerCorner', 'upperCorner'];
+    var values = [extent[0] + ' ' + extent[1], extent[2] + ' ' + extent[3]];
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    {
+      node: node
+    }, this.ENVELOPE_SERIALIZERS_, _xml.OBJECT_PROPERTY_NODE_FACTORY, values, objectStack, keys, this);
+  };
+  /**
+   * @const
+   * @param {*} value Value.
+   * @param {Array<*>} objectStack Object stack.
+   * @param {string=} opt_nodeName Node name.
+   * @return {Node|undefined} Node.
+   * @private
+   */
+
+
+  GML2.prototype.MULTIGEOMETRY_MEMBER_NODE_FACTORY_ = function MULTIGEOMETRY_MEMBER_NODE_FACTORY_(value, objectStack, opt_nodeName) {
+    var parentNode = objectStack[objectStack.length - 1].node;
+    return (0, _xml.createElementNS)('http://www.opengis.net/gml', MULTIGEOMETRY_TO_MEMBER_NODENAME[parentNode.nodeName]);
+  };
+
+  return GML2;
+}(_GMLBase.default);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+
+GML2.prototype.GEOMETRY_FLAT_COORDINATES_PARSERS = {
+  'http://www.opengis.net/gml': {
+    'coordinates': (0, _xml.makeReplacer)(GML2.prototype.readFlatCoordinates_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+GML2.prototype.FLAT_LINEAR_RINGS_PARSERS = {
+  'http://www.opengis.net/gml': {
+    'innerBoundaryIs': GML2.prototype.innerBoundaryIsParser_,
+    'outerBoundaryIs': GML2.prototype.outerBoundaryIsParser_
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @private
+ */
+
+GML2.prototype.BOX_PARSERS_ = {
+  'http://www.opengis.net/gml': {
+    'coordinates': (0, _xml.makeArrayPusher)(GML2.prototype.readFlatCoordinates_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ * @protected
+ */
+
+GML2.prototype.GEOMETRY_PARSERS = {
+  'http://www.opengis.net/gml': {
+    'Point': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readPoint),
+    'MultiPoint': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readMultiPoint),
+    'LineString': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readLineString),
+    'MultiLineString': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readMultiLineString),
+    'LinearRing': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readLinearRing),
+    'Polygon': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readPolygon),
+    'MultiPolygon': (0, _xml.makeReplacer)(_GMLBase.default.prototype.readMultiPolygon),
+    'Box': (0, _xml.makeReplacer)(GML2.prototype.readBox_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML2.prototype.GEOMETRY_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'Curve': (0, _xml.makeChildAppender)(GML2.prototype.writeCurveOrLineString_),
+    'MultiCurve': (0, _xml.makeChildAppender)(GML2.prototype.writeMultiCurveOrLineString_),
+    'Point': (0, _xml.makeChildAppender)(GML2.prototype.writePoint_),
+    'MultiPoint': (0, _xml.makeChildAppender)(GML2.prototype.writeMultiPoint_),
+    'LineString': (0, _xml.makeChildAppender)(GML2.prototype.writeCurveOrLineString_),
+    'MultiLineString': (0, _xml.makeChildAppender)(GML2.prototype.writeMultiCurveOrLineString_),
+    'LinearRing': (0, _xml.makeChildAppender)(GML2.prototype.writeLinearRing_),
+    'Polygon': (0, _xml.makeChildAppender)(GML2.prototype.writeSurfaceOrPolygon_),
+    'MultiPolygon': (0, _xml.makeChildAppender)(GML2.prototype.writeMultiSurfaceOrPolygon_),
+    'Surface': (0, _xml.makeChildAppender)(GML2.prototype.writeSurfaceOrPolygon_),
+    'MultiSurface': (0, _xml.makeChildAppender)(GML2.prototype.writeMultiSurfaceOrPolygon_),
+    'Envelope': (0, _xml.makeChildAppender)(GML2.prototype.writeEnvelope)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML2.prototype.LINESTRINGORCURVEMEMBER_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'lineStringMember': (0, _xml.makeChildAppender)(GML2.prototype.writeLineStringOrCurveMember_),
+    'curveMember': (0, _xml.makeChildAppender)(GML2.prototype.writeLineStringOrCurveMember_)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML2.prototype.RING_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'outerBoundaryIs': (0, _xml.makeChildAppender)(GML2.prototype.writeRing_),
+    'innerBoundaryIs': (0, _xml.makeChildAppender)(GML2.prototype.writeRing_)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML2.prototype.POINTMEMBER_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'pointMember': (0, _xml.makeChildAppender)(GML2.prototype.writePointMember_)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML2.prototype.SURFACEORPOLYGONMEMBER_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'surfaceMember': (0, _xml.makeChildAppender)(GML2.prototype.writeSurfaceOrPolygonMember_),
+    'polygonMember': (0, _xml.makeChildAppender)(GML2.prototype.writeSurfaceOrPolygonMember_)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ * @private
+ */
+
+GML2.prototype.ENVELOPE_SERIALIZERS_ = {
+  'http://www.opengis.net/gml': {
+    'lowerCorner': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode),
+    'upperCorner': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode)
+  }
+};
+var _default = GML2;
+exports.default = _default;
+},{"../extent.js":"../node_modules/ol/extent.js","./Feature.js":"../node_modules/ol/format/Feature.js","./GMLBase.js":"../node_modules/ol/format/GMLBase.js","./xsd.js":"../node_modules/ol/format/xsd.js","../obj.js":"../node_modules/ol/obj.js","../proj.js":"../node_modules/ol/proj.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/filter/Filter.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+/**
+ * @module ol/format/filter/Filter
+ */
+
+/**
+ * @classdesc
+ * Abstract class; normally only used for creating subclasses and not instantiated in apps.
+ * Base class for WFS GetFeature filters.
+ *
+ * @abstract
+ */
+var Filter = function Filter(tagName) {
+  /**
+   * @private
+   * @type {!string}
+   */
+  this.tagName_ = tagName;
+};
+/**
+ * The XML tag name for a filter.
+ * @returns {!string} Name.
+ */
+
+
+Filter.prototype.getTagName = function getTagName() {
+  return this.tagName_;
+};
+
+var _default = Filter;
+exports.default = _default;
+},{}],"../node_modules/ol/format/filter/LogicalNary.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _asserts = require("../../asserts.js");
+
+var _Filter = _interopRequireDefault(require("./Filter.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/LogicalNary
+ */
+
+/**
+ * @classdesc
+ * Abstract class; normally only used for creating subclasses and not instantiated in apps.
+ * Base class for WFS GetFeature n-ary logical filters.
+ *
+ * @abstract
+ */
+var LogicalNary =
+/*@__PURE__*/
+function (Filter) {
+  function LogicalNary(tagName, conditions) {
+    Filter.call(this, tagName);
+    /**
+     * @type {Array<import("./Filter.js").default>}
+     */
+
+    this.conditions = conditions;
+    (0, _asserts.assert)(this.conditions.length >= 2, 57); // At least 2 conditions are required.
+  }
+
+  if (Filter) LogicalNary.__proto__ = Filter;
+  LogicalNary.prototype = Object.create(Filter && Filter.prototype);
+  LogicalNary.prototype.constructor = LogicalNary;
+  return LogicalNary;
+}(_Filter.default);
+
+var _default = LogicalNary;
+exports.default = _default;
+},{"../../asserts.js":"../node_modules/ol/asserts.js","./Filter.js":"../node_modules/ol/format/filter/Filter.js"}],"../node_modules/ol/format/filter/And.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _LogicalNary = _interopRequireDefault(require("./LogicalNary.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/And
+ */
+
+/**
+ * @classdesc
+ * Represents a logical `<And>` operator between two or more filter conditions.
+ *
+ * @abstract
+ */
+var And =
+/*@__PURE__*/
+function (LogicalNary) {
+  function And(conditions) {
+    LogicalNary.call(this, 'And', Array.prototype.slice.call(arguments));
+  }
+
+  if (LogicalNary) And.__proto__ = LogicalNary;
+  And.prototype = Object.create(LogicalNary && LogicalNary.prototype);
+  And.prototype.constructor = And;
+  return And;
+}(_LogicalNary.default);
+
+var _default = And;
+exports.default = _default;
+},{"./LogicalNary.js":"../node_modules/ol/format/filter/LogicalNary.js"}],"../node_modules/ol/format/filter/Bbox.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Filter = _interopRequireDefault(require("./Filter.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/Bbox
+ */
+
+/**
+ * @classdesc
+ * Represents a `<BBOX>` operator to test whether a geometry-valued property
+ * intersects a fixed bounding box
+ *
+ * @api
+ */
+var Bbox =
+/*@__PURE__*/
+function (Filter) {
+  function Bbox(geometryName, extent, opt_srsName) {
+    Filter.call(this, 'BBOX');
+    /**
+     * @type {!string}
+     */
+
+    this.geometryName = geometryName;
+    /**
+     * @type {import("../../extent.js").Extent}
+     */
+
+    this.extent = extent;
+    /**
+     * @type {string|undefined}
+     */
+
+    this.srsName = opt_srsName;
+  }
+
+  if (Filter) Bbox.__proto__ = Filter;
+  Bbox.prototype = Object.create(Filter && Filter.prototype);
+  Bbox.prototype.constructor = Bbox;
+  return Bbox;
+}(_Filter.default);
+
+var _default = Bbox;
+exports.default = _default;
+},{"./Filter.js":"../node_modules/ol/format/filter/Filter.js"}],"../node_modules/ol/format/filter/Spatial.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Filter = _interopRequireDefault(require("./Filter.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/Spatial
+ */
+
+/**
+ * @classdesc
+ * Abstract class; normally only used for creating subclasses and not instantiated in apps.
+ * Represents a spatial operator to test whether a geometry-valued property
+ * relates to a given geometry.
+ *
+ * @abstract
+ */
+var Spatial =
+/*@__PURE__*/
+function (Filter) {
+  function Spatial(tagName, geometryName, geometry, opt_srsName) {
+    Filter.call(this, tagName);
+    /**
+     * @type {!string}
+     */
+
+    this.geometryName = geometryName || 'the_geom';
+    /**
+     * @type {import("../../geom/Geometry.js").default}
+     */
+
+    this.geometry = geometry;
+    /**
+     * @type {string|undefined}
+     */
+
+    this.srsName = opt_srsName;
+  }
+
+  if (Filter) Spatial.__proto__ = Filter;
+  Spatial.prototype = Object.create(Filter && Filter.prototype);
+  Spatial.prototype.constructor = Spatial;
+  return Spatial;
+}(_Filter.default);
+
+var _default = Spatial;
+exports.default = _default;
+},{"./Filter.js":"../node_modules/ol/format/filter/Filter.js"}],"../node_modules/ol/format/filter/Contains.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Spatial = _interopRequireDefault(require("./Spatial.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/Contains
+ */
+
+/**
+ * @classdesc
+ * Represents a `<Contains>` operator to test whether a geometry-valued property
+ * contains a given geometry.
+ * @api
+ */
+var Contains =
+/*@__PURE__*/
+function (Spatial) {
+  function Contains(geometryName, geometry, opt_srsName) {
+    Spatial.call(this, 'Contains', geometryName, geometry, opt_srsName);
+  }
+
+  if (Spatial) Contains.__proto__ = Spatial;
+  Contains.prototype = Object.create(Spatial && Spatial.prototype);
+  Contains.prototype.constructor = Contains;
+  return Contains;
+}(_Spatial.default);
+
+var _default = Contains;
+exports.default = _default;
+},{"./Spatial.js":"../node_modules/ol/format/filter/Spatial.js"}],"../node_modules/ol/format/filter/Comparison.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Filter = _interopRequireDefault(require("./Filter.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/Comparison
+ */
+
+/**
+ * @classdesc
+ * Abstract class; normally only used for creating subclasses and not instantiated in apps.
+ * Base class for WFS GetFeature property comparison filters.
+ *
+ * @abstract
+ */
+var Comparison =
+/*@__PURE__*/
+function (Filter) {
+  function Comparison(tagName, propertyName) {
+    Filter.call(this, tagName);
+    /**
+     * @type {!string}
+     */
+
+    this.propertyName = propertyName;
+  }
+
+  if (Filter) Comparison.__proto__ = Filter;
+  Comparison.prototype = Object.create(Filter && Filter.prototype);
+  Comparison.prototype.constructor = Comparison;
+  return Comparison;
+}(_Filter.default);
+
+var _default = Comparison;
+exports.default = _default;
+},{"./Filter.js":"../node_modules/ol/format/filter/Filter.js"}],"../node_modules/ol/format/filter/During.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Comparison = _interopRequireDefault(require("./Comparison.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/During
+ */
+
+/**
+ * @classdesc
+ * Represents a `<During>` comparison operator.
+ * @api
+ */
+var During =
+/*@__PURE__*/
+function (Comparison) {
+  function During(propertyName, begin, end) {
+    Comparison.call(this, 'During', propertyName);
+    /**
+     * @type {!string}
+     */
+
+    this.begin = begin;
+    /**
+     * @type {!string}
+     */
+
+    this.end = end;
+  }
+
+  if (Comparison) During.__proto__ = Comparison;
+  During.prototype = Object.create(Comparison && Comparison.prototype);
+  During.prototype.constructor = During;
+  return During;
+}(_Comparison.default);
+
+var _default = During;
+exports.default = _default;
+},{"./Comparison.js":"../node_modules/ol/format/filter/Comparison.js"}],"../node_modules/ol/format/filter/ComparisonBinary.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Comparison = _interopRequireDefault(require("./Comparison.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/ComparisonBinary
+ */
+
+/**
+ * @classdesc
+ * Abstract class; normally only used for creating subclasses and not instantiated in apps.
+ * Base class for WFS GetFeature property binary comparison filters.
+ *
+ * @abstract
+ */
+var ComparisonBinary =
+/*@__PURE__*/
+function (Comparison) {
+  function ComparisonBinary(tagName, propertyName, expression, opt_matchCase) {
+    Comparison.call(this, tagName, propertyName);
+    /**
+     * @type {!(string|number)}
+     */
+
+    this.expression = expression;
+    /**
+     * @type {boolean|undefined}
+     */
+
+    this.matchCase = opt_matchCase;
+  }
+
+  if (Comparison) ComparisonBinary.__proto__ = Comparison;
+  ComparisonBinary.prototype = Object.create(Comparison && Comparison.prototype);
+  ComparisonBinary.prototype.constructor = ComparisonBinary;
+  return ComparisonBinary;
+}(_Comparison.default);
+
+var _default = ComparisonBinary;
+exports.default = _default;
+},{"./Comparison.js":"../node_modules/ol/format/filter/Comparison.js"}],"../node_modules/ol/format/filter/EqualTo.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _ComparisonBinary = _interopRequireDefault(require("./ComparisonBinary.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/EqualTo
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsEqualTo>` comparison operator.
+ * @api
+ */
+var EqualTo =
+/*@__PURE__*/
+function (ComparisonBinary) {
+  function EqualTo(propertyName, expression, opt_matchCase) {
+    ComparisonBinary.call(this, 'PropertyIsEqualTo', propertyName, expression, opt_matchCase);
+  }
+
+  if (ComparisonBinary) EqualTo.__proto__ = ComparisonBinary;
+  EqualTo.prototype = Object.create(ComparisonBinary && ComparisonBinary.prototype);
+  EqualTo.prototype.constructor = EqualTo;
+  return EqualTo;
+}(_ComparisonBinary.default);
+
+var _default = EqualTo;
+exports.default = _default;
+},{"./ComparisonBinary.js":"../node_modules/ol/format/filter/ComparisonBinary.js"}],"../node_modules/ol/format/filter/GreaterThan.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _ComparisonBinary = _interopRequireDefault(require("./ComparisonBinary.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/GreaterThan
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsGreaterThan>` comparison operator.
+ * @api
+ */
+var GreaterThan =
+/*@__PURE__*/
+function (ComparisonBinary) {
+  function GreaterThan(propertyName, expression) {
+    ComparisonBinary.call(this, 'PropertyIsGreaterThan', propertyName, expression);
+  }
+
+  if (ComparisonBinary) GreaterThan.__proto__ = ComparisonBinary;
+  GreaterThan.prototype = Object.create(ComparisonBinary && ComparisonBinary.prototype);
+  GreaterThan.prototype.constructor = GreaterThan;
+  return GreaterThan;
+}(_ComparisonBinary.default);
+
+var _default = GreaterThan;
+exports.default = _default;
+},{"./ComparisonBinary.js":"../node_modules/ol/format/filter/ComparisonBinary.js"}],"../node_modules/ol/format/filter/GreaterThanOrEqualTo.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _ComparisonBinary = _interopRequireDefault(require("./ComparisonBinary.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/GreaterThanOrEqualTo
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsGreaterThanOrEqualTo>` comparison operator.
+ * @api
+ */
+var GreaterThanOrEqualTo =
+/*@__PURE__*/
+function (ComparisonBinary) {
+  function GreaterThanOrEqualTo(propertyName, expression) {
+    ComparisonBinary.call(this, 'PropertyIsGreaterThanOrEqualTo', propertyName, expression);
+  }
+
+  if (ComparisonBinary) GreaterThanOrEqualTo.__proto__ = ComparisonBinary;
+  GreaterThanOrEqualTo.prototype = Object.create(ComparisonBinary && ComparisonBinary.prototype);
+  GreaterThanOrEqualTo.prototype.constructor = GreaterThanOrEqualTo;
+  return GreaterThanOrEqualTo;
+}(_ComparisonBinary.default);
+
+var _default = GreaterThanOrEqualTo;
+exports.default = _default;
+},{"./ComparisonBinary.js":"../node_modules/ol/format/filter/ComparisonBinary.js"}],"../node_modules/ol/format/filter/Intersects.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Spatial = _interopRequireDefault(require("./Spatial.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/Intersects
+ */
+
+/**
+ * @classdesc
+ * Represents a `<Intersects>` operator to test whether a geometry-valued property
+ * intersects a given geometry.
+ * @api
+ */
+var Intersects =
+/*@__PURE__*/
+function (Spatial) {
+  function Intersects(geometryName, geometry, opt_srsName) {
+    Spatial.call(this, 'Intersects', geometryName, geometry, opt_srsName);
+  }
+
+  if (Spatial) Intersects.__proto__ = Spatial;
+  Intersects.prototype = Object.create(Spatial && Spatial.prototype);
+  Intersects.prototype.constructor = Intersects;
+  return Intersects;
+}(_Spatial.default);
+
+var _default = Intersects;
+exports.default = _default;
+},{"./Spatial.js":"../node_modules/ol/format/filter/Spatial.js"}],"../node_modules/ol/format/filter/IsBetween.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Comparison = _interopRequireDefault(require("./Comparison.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/IsBetween
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsBetween>` comparison operator.
+ * @api
+ */
+var IsBetween =
+/*@__PURE__*/
+function (Comparison) {
+  function IsBetween(propertyName, lowerBoundary, upperBoundary) {
+    Comparison.call(this, 'PropertyIsBetween', propertyName);
+    /**
+     * @type {!number}
+     */
+
+    this.lowerBoundary = lowerBoundary;
+    /**
+     * @type {!number}
+     */
+
+    this.upperBoundary = upperBoundary;
+  }
+
+  if (Comparison) IsBetween.__proto__ = Comparison;
+  IsBetween.prototype = Object.create(Comparison && Comparison.prototype);
+  IsBetween.prototype.constructor = IsBetween;
+  return IsBetween;
+}(_Comparison.default);
+
+var _default = IsBetween;
+exports.default = _default;
+},{"./Comparison.js":"../node_modules/ol/format/filter/Comparison.js"}],"../node_modules/ol/format/filter/IsLike.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Comparison = _interopRequireDefault(require("./Comparison.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/IsLike
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsLike>` comparison operator.
+ * @api
+ */
+var IsLike =
+/*@__PURE__*/
+function (Comparison) {
+  function IsLike(propertyName, pattern, opt_wildCard, opt_singleChar, opt_escapeChar, opt_matchCase) {
+    Comparison.call(this, 'PropertyIsLike', propertyName);
+    /**
+     * @type {!string}
+     */
+
+    this.pattern = pattern;
+    /**
+     * @type {!string}
+     */
+
+    this.wildCard = opt_wildCard !== undefined ? opt_wildCard : '*';
+    /**
+     * @type {!string}
+     */
+
+    this.singleChar = opt_singleChar !== undefined ? opt_singleChar : '.';
+    /**
+     * @type {!string}
+     */
+
+    this.escapeChar = opt_escapeChar !== undefined ? opt_escapeChar : '!';
+    /**
+     * @type {boolean|undefined}
+     */
+
+    this.matchCase = opt_matchCase;
+  }
+
+  if (Comparison) IsLike.__proto__ = Comparison;
+  IsLike.prototype = Object.create(Comparison && Comparison.prototype);
+  IsLike.prototype.constructor = IsLike;
+  return IsLike;
+}(_Comparison.default);
+
+var _default = IsLike;
+exports.default = _default;
+},{"./Comparison.js":"../node_modules/ol/format/filter/Comparison.js"}],"../node_modules/ol/format/filter/IsNull.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Comparison = _interopRequireDefault(require("./Comparison.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/IsNull
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsNull>` comparison operator.
+ * @api
+ */
+var IsNull =
+/*@__PURE__*/
+function (Comparison) {
+  function IsNull(propertyName) {
+    Comparison.call(this, 'PropertyIsNull', propertyName);
+  }
+
+  if (Comparison) IsNull.__proto__ = Comparison;
+  IsNull.prototype = Object.create(Comparison && Comparison.prototype);
+  IsNull.prototype.constructor = IsNull;
+  return IsNull;
+}(_Comparison.default);
+
+var _default = IsNull;
+exports.default = _default;
+},{"./Comparison.js":"../node_modules/ol/format/filter/Comparison.js"}],"../node_modules/ol/format/filter/LessThan.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _ComparisonBinary = _interopRequireDefault(require("./ComparisonBinary.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/LessThan
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsLessThan>` comparison operator.
+ * @api
+ */
+var LessThan =
+/*@__PURE__*/
+function (ComparisonBinary) {
+  function LessThan(propertyName, expression) {
+    ComparisonBinary.call(this, 'PropertyIsLessThan', propertyName, expression);
+  }
+
+  if (ComparisonBinary) LessThan.__proto__ = ComparisonBinary;
+  LessThan.prototype = Object.create(ComparisonBinary && ComparisonBinary.prototype);
+  LessThan.prototype.constructor = LessThan;
+  return LessThan;
+}(_ComparisonBinary.default);
+
+var _default = LessThan;
+exports.default = _default;
+},{"./ComparisonBinary.js":"../node_modules/ol/format/filter/ComparisonBinary.js"}],"../node_modules/ol/format/filter/LessThanOrEqualTo.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _ComparisonBinary = _interopRequireDefault(require("./ComparisonBinary.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/LessThanOrEqualTo
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsLessThanOrEqualTo>` comparison operator.
+ * @api
+ */
+var LessThanOrEqualTo =
+/*@__PURE__*/
+function (ComparisonBinary) {
+  function LessThanOrEqualTo(propertyName, expression) {
+    ComparisonBinary.call(this, 'PropertyIsLessThanOrEqualTo', propertyName, expression);
+  }
+
+  if (ComparisonBinary) LessThanOrEqualTo.__proto__ = ComparisonBinary;
+  LessThanOrEqualTo.prototype = Object.create(ComparisonBinary && ComparisonBinary.prototype);
+  LessThanOrEqualTo.prototype.constructor = LessThanOrEqualTo;
+  return LessThanOrEqualTo;
+}(_ComparisonBinary.default);
+
+var _default = LessThanOrEqualTo;
+exports.default = _default;
+},{"./ComparisonBinary.js":"../node_modules/ol/format/filter/ComparisonBinary.js"}],"../node_modules/ol/format/filter/Not.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Filter = _interopRequireDefault(require("./Filter.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/Not
+ */
+
+/**
+ * @classdesc
+ * Represents a logical `<Not>` operator for a filter condition.
+ * @api
+ */
+var Not =
+/*@__PURE__*/
+function (Filter) {
+  function Not(condition) {
+    Filter.call(this, 'Not');
+    /**
+     * @type {!import("./Filter.js").default}
+     */
+
+    this.condition = condition;
+  }
+
+  if (Filter) Not.__proto__ = Filter;
+  Not.prototype = Object.create(Filter && Filter.prototype);
+  Not.prototype.constructor = Not;
+  return Not;
+}(_Filter.default);
+
+var _default = Not;
+exports.default = _default;
+},{"./Filter.js":"../node_modules/ol/format/filter/Filter.js"}],"../node_modules/ol/format/filter/NotEqualTo.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _ComparisonBinary = _interopRequireDefault(require("./ComparisonBinary.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/NotEqualTo
+ */
+
+/**
+ * @classdesc
+ * Represents a `<PropertyIsNotEqualTo>` comparison operator.
+ * @api
+ */
+var NotEqualTo =
+/*@__PURE__*/
+function (ComparisonBinary) {
+  function NotEqualTo(propertyName, expression, opt_matchCase) {
+    ComparisonBinary.call(this, 'PropertyIsNotEqualTo', propertyName, expression, opt_matchCase);
+  }
+
+  if (ComparisonBinary) NotEqualTo.__proto__ = ComparisonBinary;
+  NotEqualTo.prototype = Object.create(ComparisonBinary && ComparisonBinary.prototype);
+  NotEqualTo.prototype.constructor = NotEqualTo;
+  return NotEqualTo;
+}(_ComparisonBinary.default);
+
+var _default = NotEqualTo;
+exports.default = _default;
+},{"./ComparisonBinary.js":"../node_modules/ol/format/filter/ComparisonBinary.js"}],"../node_modules/ol/format/filter/Or.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _LogicalNary = _interopRequireDefault(require("./LogicalNary.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/Or
+ */
+
+/**
+ * @classdesc
+ * Represents a logical `<Or>` operator between two ore more filter conditions.
+ * @api
+ */
+var Or =
+/*@__PURE__*/
+function (LogicalNary) {
+  function Or(conditions) {
+    LogicalNary.call(this, 'Or', Array.prototype.slice.call(arguments));
+  }
+
+  if (LogicalNary) Or.__proto__ = LogicalNary;
+  Or.prototype = Object.create(LogicalNary && LogicalNary.prototype);
+  Or.prototype.constructor = Or;
+  return Or;
+}(_LogicalNary.default);
+
+var _default = Or;
+exports.default = _default;
+},{"./LogicalNary.js":"../node_modules/ol/format/filter/LogicalNary.js"}],"../node_modules/ol/format/filter/Within.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Spatial = _interopRequireDefault(require("./Spatial.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter/Within
+ */
+
+/**
+ * @classdesc
+ * Represents a `<Within>` operator to test whether a geometry-valued property
+ * is within a given geometry.
+ * @api
+ */
+var Within =
+/*@__PURE__*/
+function (Spatial) {
+  function Within(geometryName, geometry, opt_srsName) {
+    Spatial.call(this, 'Within', geometryName, geometry, opt_srsName);
+  }
+
+  if (Spatial) Within.__proto__ = Spatial;
+  Within.prototype = Object.create(Spatial && Spatial.prototype);
+  Within.prototype.constructor = Within;
+  return Within;
+}(_Spatial.default);
+
+var _default = Within;
+exports.default = _default;
+},{"./Spatial.js":"../node_modules/ol/format/filter/Spatial.js"}],"../node_modules/ol/format/filter.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.and = and;
+exports.or = or;
+exports.not = not;
+exports.bbox = bbox;
+exports.contains = contains;
+exports.intersects = intersects;
+exports.within = within;
+exports.equalTo = equalTo;
+exports.notEqualTo = notEqualTo;
+exports.lessThan = lessThan;
+exports.lessThanOrEqualTo = lessThanOrEqualTo;
+exports.greaterThan = greaterThan;
+exports.greaterThanOrEqualTo = greaterThanOrEqualTo;
+exports.isNull = isNull;
+exports.between = between;
+exports.like = like;
+exports.during = during;
+
+var _And = _interopRequireDefault(require("./filter/And.js"));
+
+var _Bbox = _interopRequireDefault(require("./filter/Bbox.js"));
+
+var _Contains = _interopRequireDefault(require("./filter/Contains.js"));
+
+var _During = _interopRequireDefault(require("./filter/During.js"));
+
+var _EqualTo = _interopRequireDefault(require("./filter/EqualTo.js"));
+
+var _GreaterThan = _interopRequireDefault(require("./filter/GreaterThan.js"));
+
+var _GreaterThanOrEqualTo = _interopRequireDefault(require("./filter/GreaterThanOrEqualTo.js"));
+
+var _Intersects = _interopRequireDefault(require("./filter/Intersects.js"));
+
+var _IsBetween = _interopRequireDefault(require("./filter/IsBetween.js"));
+
+var _IsLike = _interopRequireDefault(require("./filter/IsLike.js"));
+
+var _IsNull = _interopRequireDefault(require("./filter/IsNull.js"));
+
+var _LessThan = _interopRequireDefault(require("./filter/LessThan.js"));
+
+var _LessThanOrEqualTo = _interopRequireDefault(require("./filter/LessThanOrEqualTo.js"));
+
+var _Not = _interopRequireDefault(require("./filter/Not.js"));
+
+var _NotEqualTo = _interopRequireDefault(require("./filter/NotEqualTo.js"));
+
+var _Or = _interopRequireDefault(require("./filter/Or.js"));
+
+var _Within = _interopRequireDefault(require("./filter/Within.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/filter
+ */
+
+/**
+ * Create a logical `<And>` operator between two or more filter conditions.
+ *
+ * @param {...import("./filter/Filter.js").default} conditions Filter conditions.
+ * @returns {!And} `<And>` operator.
+ * @api
+ */
+function and(conditions) {
+  var params = [null].concat(Array.prototype.slice.call(arguments));
+  return new (Function.prototype.bind.apply(_And.default, params))();
+}
+/**
+ * Create a logical `<Or>` operator between two or more filter conditions.
+ *
+ * @param {...import("./filter/Filter.js").default} conditions Filter conditions.
+ * @returns {!Or} `<Or>` operator.
+ * @api
+ */
+
+
+function or(conditions) {
+  var params = [null].concat(Array.prototype.slice.call(arguments));
+  return new (Function.prototype.bind.apply(_Or.default, params))();
+}
+/**
+ * Represents a logical `<Not>` operator for a filter condition.
+ *
+ * @param {!import("./filter/Filter.js").default} condition Filter condition.
+ * @returns {!Not} `<Not>` operator.
+ * @api
+ */
+
+
+function not(condition) {
+  return new _Not.default(condition);
+}
+/**
+ * Create a `<BBOX>` operator to test whether a geometry-valued property
+ * intersects a fixed bounding box
+ *
+ * @param {!string} geometryName Geometry name to use.
+ * @param {!import("../extent.js").Extent} extent Extent.
+ * @param {string=} opt_srsName SRS name. No srsName attribute will be
+ *    set on geometries when this is not provided.
+ * @returns {!Bbox} `<BBOX>` operator.
+ * @api
+ */
+
+
+function bbox(geometryName, extent, opt_srsName) {
+  return new _Bbox.default(geometryName, extent, opt_srsName);
+}
+/**
+ * Create a `<Contains>` operator to test whether a geometry-valued property
+ * contains a given geometry.
+ *
+ * @param {!string} geometryName Geometry name to use.
+ * @param {!import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {string=} opt_srsName SRS name. No srsName attribute will be
+ *    set on geometries when this is not provided.
+ * @returns {!Contains} `<Contains>` operator.
+ * @api
+ */
+
+
+function contains(geometryName, geometry, opt_srsName) {
+  return new _Contains.default(geometryName, geometry, opt_srsName);
+}
+/**
+ * Create a `<Intersects>` operator to test whether a geometry-valued property
+ * intersects a given geometry.
+ *
+ * @param {!string} geometryName Geometry name to use.
+ * @param {!import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {string=} opt_srsName SRS name. No srsName attribute will be
+ *    set on geometries when this is not provided.
+ * @returns {!Intersects} `<Intersects>` operator.
+ * @api
+ */
+
+
+function intersects(geometryName, geometry, opt_srsName) {
+  return new _Intersects.default(geometryName, geometry, opt_srsName);
+}
+/**
+ * Create a `<Within>` operator to test whether a geometry-valued property
+ * is within a given geometry.
+ *
+ * @param {!string} geometryName Geometry name to use.
+ * @param {!import("../geom/Geometry.js").default} geometry Geometry.
+ * @param {string=} opt_srsName SRS name. No srsName attribute will be
+ *    set on geometries when this is not provided.
+ * @returns {!Within} `<Within>` operator.
+ * @api
+ */
+
+
+function within(geometryName, geometry, opt_srsName) {
+  return new _Within.default(geometryName, geometry, opt_srsName);
+}
+/**
+ * Creates a `<PropertyIsEqualTo>` comparison operator.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!(string|number)} expression The value to compare.
+ * @param {boolean=} opt_matchCase Case-sensitive?
+ * @returns {!EqualTo} `<PropertyIsEqualTo>` operator.
+ * @api
+ */
+
+
+function equalTo(propertyName, expression, opt_matchCase) {
+  return new _EqualTo.default(propertyName, expression, opt_matchCase);
+}
+/**
+ * Creates a `<PropertyIsNotEqualTo>` comparison operator.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!(string|number)} expression The value to compare.
+ * @param {boolean=} opt_matchCase Case-sensitive?
+ * @returns {!NotEqualTo} `<PropertyIsNotEqualTo>` operator.
+ * @api
+ */
+
+
+function notEqualTo(propertyName, expression, opt_matchCase) {
+  return new _NotEqualTo.default(propertyName, expression, opt_matchCase);
+}
+/**
+ * Creates a `<PropertyIsLessThan>` comparison operator.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!number} expression The value to compare.
+ * @returns {!LessThan} `<PropertyIsLessThan>` operator.
+ * @api
+ */
+
+
+function lessThan(propertyName, expression) {
+  return new _LessThan.default(propertyName, expression);
+}
+/**
+ * Creates a `<PropertyIsLessThanOrEqualTo>` comparison operator.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!number} expression The value to compare.
+ * @returns {!LessThanOrEqualTo} `<PropertyIsLessThanOrEqualTo>` operator.
+ * @api
+ */
+
+
+function lessThanOrEqualTo(propertyName, expression) {
+  return new _LessThanOrEqualTo.default(propertyName, expression);
+}
+/**
+ * Creates a `<PropertyIsGreaterThan>` comparison operator.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!number} expression The value to compare.
+ * @returns {!GreaterThan} `<PropertyIsGreaterThan>` operator.
+ * @api
+ */
+
+
+function greaterThan(propertyName, expression) {
+  return new _GreaterThan.default(propertyName, expression);
+}
+/**
+ * Creates a `<PropertyIsGreaterThanOrEqualTo>` comparison operator.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!number} expression The value to compare.
+ * @returns {!GreaterThanOrEqualTo} `<PropertyIsGreaterThanOrEqualTo>` operator.
+ * @api
+ */
+
+
+function greaterThanOrEqualTo(propertyName, expression) {
+  return new _GreaterThanOrEqualTo.default(propertyName, expression);
+}
+/**
+ * Creates a `<PropertyIsNull>` comparison operator to test whether a property value
+ * is null.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @returns {!IsNull} `<PropertyIsNull>` operator.
+ * @api
+ */
+
+
+function isNull(propertyName) {
+  return new _IsNull.default(propertyName);
+}
+/**
+ * Creates a `<PropertyIsBetween>` comparison operator to test whether an expression
+ * value lies within a range given by a lower and upper bound (inclusive).
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!number} lowerBoundary The lower bound of the range.
+ * @param {!number} upperBoundary The upper bound of the range.
+ * @returns {!IsBetween} `<PropertyIsBetween>` operator.
+ * @api
+ */
+
+
+function between(propertyName, lowerBoundary, upperBoundary) {
+  return new _IsBetween.default(propertyName, lowerBoundary, upperBoundary);
+}
+/**
+ * Represents a `<PropertyIsLike>` comparison operator that matches a string property
+ * value against a text pattern.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!string} pattern Text pattern.
+ * @param {string=} opt_wildCard Pattern character which matches any sequence of
+ *    zero or more string characters. Default is '*'.
+ * @param {string=} opt_singleChar pattern character which matches any single
+ *    string character. Default is '.'.
+ * @param {string=} opt_escapeChar Escape character which can be used to escape
+ *    the pattern characters. Default is '!'.
+ * @param {boolean=} opt_matchCase Case-sensitive?
+ * @returns {!IsLike} `<PropertyIsLike>` operator.
+ * @api
+ */
+
+
+function like(propertyName, pattern, opt_wildCard, opt_singleChar, opt_escapeChar, opt_matchCase) {
+  return new _IsLike.default(propertyName, pattern, opt_wildCard, opt_singleChar, opt_escapeChar, opt_matchCase);
+}
+/**
+ * Create a `<During>` temporal operator.
+ *
+ * @param {!string} propertyName Name of the context property to compare.
+ * @param {!string} begin The begin date in ISO-8601 format.
+ * @param {!string} end The end date in ISO-8601 format.
+ * @returns {!During} `<During>` operator.
+ * @api
+ */
+
+
+function during(propertyName, begin, end) {
+  return new _During.default(propertyName, begin, end);
+}
+},{"./filter/And.js":"../node_modules/ol/format/filter/And.js","./filter/Bbox.js":"../node_modules/ol/format/filter/Bbox.js","./filter/Contains.js":"../node_modules/ol/format/filter/Contains.js","./filter/During.js":"../node_modules/ol/format/filter/During.js","./filter/EqualTo.js":"../node_modules/ol/format/filter/EqualTo.js","./filter/GreaterThan.js":"../node_modules/ol/format/filter/GreaterThan.js","./filter/GreaterThanOrEqualTo.js":"../node_modules/ol/format/filter/GreaterThanOrEqualTo.js","./filter/Intersects.js":"../node_modules/ol/format/filter/Intersects.js","./filter/IsBetween.js":"../node_modules/ol/format/filter/IsBetween.js","./filter/IsLike.js":"../node_modules/ol/format/filter/IsLike.js","./filter/IsNull.js":"../node_modules/ol/format/filter/IsNull.js","./filter/LessThan.js":"../node_modules/ol/format/filter/LessThan.js","./filter/LessThanOrEqualTo.js":"../node_modules/ol/format/filter/LessThanOrEqualTo.js","./filter/Not.js":"../node_modules/ol/format/filter/Not.js","./filter/NotEqualTo.js":"../node_modules/ol/format/filter/NotEqualTo.js","./filter/Or.js":"../node_modules/ol/format/filter/Or.js","./filter/Within.js":"../node_modules/ol/format/filter/Within.js"}],"../node_modules/ol/format/WFS.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.writeFilter = writeFilter;
+exports.default = void 0;
+
+var _asserts = require("../asserts.js");
+
+var _GML = _interopRequireDefault(require("./GML2.js"));
+
+var _GML2 = _interopRequireDefault(require("./GML3.js"));
+
+var _GMLBase = _interopRequireWildcard(require("./GMLBase.js"));
+
+var _filter = require("./filter.js");
+
+var _XMLFeature = _interopRequireDefault(require("./XMLFeature.js"));
+
+var _xsd = require("./xsd.js");
+
+var _obj = require("../obj.js");
+
+var _proj = require("../proj.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireWildcard(obj) { if (obj && obj.__esModule) { return obj; } else { var newObj = {}; if (obj != null) { for (var key in obj) { if (Object.prototype.hasOwnProperty.call(obj, key)) { var desc = Object.defineProperty && Object.getOwnPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : {}; if (desc.get || desc.set) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } } newObj.default = obj; return newObj; } }
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/WFS
+ */
+
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+var FEATURE_COLLECTION_PARSERS = {
+  'http://www.opengis.net/gml': {
+    'boundedBy': (0, _xml.makeObjectPropertySetter)(_GMLBase.default.prototype.readGeometryElement, 'bounds')
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TRANSACTION_SUMMARY_PARSERS = {
+  'http://www.opengis.net/wfs': {
+    'totalInserted': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+    'totalUpdated': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+    'totalDeleted': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger)
+  }
+};
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TRANSACTION_RESPONSE_PARSERS = {
+  'http://www.opengis.net/wfs': {
+    'TransactionSummary': (0, _xml.makeObjectPropertySetter)(readTransactionSummary, 'transactionSummary'),
+    'InsertResults': (0, _xml.makeObjectPropertySetter)(readInsertResults, 'insertIds')
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var QUERY_SERIALIZERS = {
+  'http://www.opengis.net/wfs': {
+    'PropertyName': (0, _xml.makeChildAppender)(_xsd.writeStringTextNode)
+  }
+};
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+var TRANSACTION_SERIALIZERS = {
+  'http://www.opengis.net/wfs': {
+    'Insert': (0, _xml.makeChildAppender)(writeFeature),
+    'Update': (0, _xml.makeChildAppender)(writeUpdate),
+    'Delete': (0, _xml.makeChildAppender)(writeDelete),
+    'Property': (0, _xml.makeChildAppender)(writeProperty),
+    'Native': (0, _xml.makeChildAppender)(writeNative)
+  }
+};
+/**
+ * @typedef {Object} Options
+ * @property {Object<string, string>|string} [featureNS] The namespace URI used for features.
+ * @property {Array<string>|string} [featureType] The feature type to parse. Only used for read operations.
+ * @property {GMLBase} [gmlFormat] The GML format to use to parse the response. Default is `ol/format/GML3`.
+ * @property {string} [schemaLocation] Optional schemaLocation to use for serialization, this will override the default.
+ */
+
+/**
+ * @typedef {Object} WriteGetFeatureOptions
+ * @property {string} featureNS The namespace URI used for features.
+ * @property {string} featurePrefix The prefix for the feature namespace.
+ * @property {Array<string>} featureTypes The feature type names.
+ * @property {string} [srsName] SRS name. No srsName attribute will be set on
+ * geometries when this is not provided.
+ * @property {string} [handle] Handle.
+ * @property {string} [outputFormat] Output format.
+ * @property {number} [maxFeatures] Maximum number of features to fetch.
+ * @property {string} [geometryName] Geometry name to use in a BBOX filter.
+ * @property {Array<string>} [propertyNames] Optional list of property names to serialize.
+ * @property {string} [viewParams] viewParams GeoServer vendor parameter.
+ * @property {number} [startIndex] Start index to use for WFS paging. This is a
+ * WFS 2.0 feature backported to WFS 1.1.0 by some Web Feature Services.
+ * @property {number} [count] Number of features to retrieve when paging. This is a
+ * WFS 2.0 feature backported to WFS 1.1.0 by some Web Feature Services. Please note that some
+ * Web Feature Services have repurposed `maxfeatures` instead.
+ * @property {import("../extent.js").Extent} [bbox] Extent to use for the BBOX filter.
+ * @property {import("./filter/Filter.js").default} [filter] Filter condition. See
+ * {@link module:ol/format/Filter} for more information.
+ * @property {string} [resultType] Indicates what response should be returned,
+ * E.g. `hits` only includes the `numberOfFeatures` attribute in the response and no features.
+ */
+
+/**
+ * @typedef {Object} WriteTransactionOptions
+ * @property {string} featureNS The namespace URI used for features.
+ * @property {string} featurePrefix The prefix for the feature namespace.
+ * @property {string} featureType The feature type name.
+ * @property {string} [srsName] SRS name. No srsName attribute will be set on
+ * geometries when this is not provided.
+ * @property {string} [handle] Handle.
+ * @property {boolean} [hasZ] Must be set to true if the transaction is for
+ * a 3D layer. This will allow the Z coordinate to be included in the transaction.
+ * @property {Array<Object>} nativeElements Native elements. Currently not supported.
+ * @property {import("./GMLBase.js").Options} [gmlOptions] GML options for the WFS transaction writer.
+ * @property {string} [version='1.1.0'] WFS version to use for the transaction. Can be either `1.0.0` or `1.1.0`.
+ */
+
+/**
+ * Number of features; bounds/extent.
+ * @typedef {Object} FeatureCollectionMetadata
+ * @property {number} numberOfFeatures
+ * @property {import("../extent.js").Extent} bounds
+ */
+
+/**
+ * Total deleted; total inserted; total updated; array of insert ids.
+ * @typedef {Object} TransactionResponse
+ * @property {number} totalDeleted
+ * @property {number} totalInserted
+ * @property {number} totalUpdated
+ * @property {Array<string>} insertIds
+ */
+
+/**
+ * @type {string}
+ */
+
+var FEATURE_PREFIX = 'feature';
+/**
+ * @type {string}
+ */
+
+var XMLNS = 'http://www.w3.org/2000/xmlns/';
+/**
+ * @type {string}
+ */
+
+var OGCNS = 'http://www.opengis.net/ogc';
+/**
+ * @type {string}
+ */
+
+var WFSNS = 'http://www.opengis.net/wfs';
+/**
+ * @type {string}
+ */
+
+var FESNS = 'http://www.opengis.net/fes';
+/**
+ * @type {Object<string, string>}
+ */
+
+var SCHEMA_LOCATIONS = {
+  '1.1.0': 'http://www.opengis.net/wfs http://schemas.opengis.net/wfs/1.1.0/wfs.xsd',
+  '1.0.0': 'http://www.opengis.net/wfs http://schemas.opengis.net/wfs/1.0.0/wfs.xsd'
+};
+/**
+ * @const
+ * @type {string}
+ */
+
+var DEFAULT_VERSION = '1.1.0';
+/**
+ * @classdesc
+ * Feature format for reading and writing data in the WFS format.
+ * By default, supports WFS version 1.1.0. You can pass a GML format
+ * as option if you want to read a WFS that contains GML2 (WFS 1.0.0).
+ * Also see {@link module:ol/format/GMLBase~GMLBase} which is used by this format.
+ *
+ * @api
+ */
+
+var WFS =
+/*@__PURE__*/
+function (XMLFeature) {
+  function WFS(opt_options) {
+    XMLFeature.call(this);
+    var options = opt_options ? opt_options : {};
+    /**
+     * @private
+     * @type {Array<string>|string|undefined}
+     */
+
+    this.featureType_ = options.featureType;
+    /**
+     * @private
+     * @type {Object<string, string>|string|undefined}
+     */
+
+    this.featureNS_ = options.featureNS;
+    /**
+     * @private
+     * @type {GMLBase}
+     */
+
+    this.gmlFormat_ = options.gmlFormat ? options.gmlFormat : new _GML2.default();
+    /**
+     * @private
+     * @type {string}
+     */
+
+    this.schemaLocation_ = options.schemaLocation ? options.schemaLocation : SCHEMA_LOCATIONS[DEFAULT_VERSION];
+  }
+
+  if (XMLFeature) WFS.__proto__ = XMLFeature;
+  WFS.prototype = Object.create(XMLFeature && XMLFeature.prototype);
+  WFS.prototype.constructor = WFS;
+  /**
+   * @return {Array<string>|string|undefined} featureType
+   */
+
+  WFS.prototype.getFeatureType = function getFeatureType() {
+    return this.featureType_;
+  };
+  /**
+   * @param {Array<string>|string|undefined} featureType Feature type(s) to parse.
+   */
+
+
+  WFS.prototype.setFeatureType = function setFeatureType(featureType) {
+    this.featureType_ = featureType;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WFS.prototype.readFeaturesFromNode = function readFeaturesFromNode(node, opt_options) {
+    /** @type {import("../xml.js").NodeStackItem} */
+    var context = {
+      node: node
+    };
+    (0, _obj.assign)(context, {
+      'featureType': this.featureType_,
+      'featureNS': this.featureNS_
+    });
+    (0, _obj.assign)(context, this.getReadOptions(node, opt_options ? opt_options : {}));
+    var objectStack = [context];
+    this.gmlFormat_.FEATURE_COLLECTION_PARSERS[_GMLBase.GMLNS]['featureMember'] = (0, _xml.makeArrayPusher)(_GMLBase.default.prototype.readFeaturesInternal);
+    var features = (0, _xml.pushParseAndPop)([], this.gmlFormat_.FEATURE_COLLECTION_PARSERS, node, objectStack, this.gmlFormat_);
+
+    if (!features) {
+      features = [];
+    }
+
+    return features;
+  };
+  /**
+   * Read transaction response of the source.
+   *
+   * @param {Document|Element|Object|string} source Source.
+   * @return {TransactionResponse|undefined} Transaction response.
+   * @api
+   */
+
+
+  WFS.prototype.readTransactionResponse = function readTransactionResponse(source) {
+    if (!source) {
+      return undefined;
+    } else if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      return this.readTransactionResponseFromDocument(doc);
+    } else if ((0, _xml.isDocument)(source)) {
+      return this.readTransactionResponseFromDocument(
+      /** @type {Document} */
+      source);
+    } else {
+      return this.readTransactionResponseFromNode(
+      /** @type {Element} */
+      source);
+    }
+  };
+  /**
+   * Read feature collection metadata of the source.
+   *
+   * @param {Document|Element|Object|string} source Source.
+   * @return {FeatureCollectionMetadata|undefined}
+   *     FeatureCollection metadata.
+   * @api
+   */
+
+
+  WFS.prototype.readFeatureCollectionMetadata = function readFeatureCollectionMetadata(source) {
+    if (!source) {
+      return undefined;
+    } else if (typeof source === 'string') {
+      var doc = (0, _xml.parse)(source);
+      return this.readFeatureCollectionMetadataFromDocument(doc);
+    } else if ((0, _xml.isDocument)(source)) {
+      return this.readFeatureCollectionMetadataFromDocument(
+      /** @type {Document} */
+      source);
+    } else {
+      return this.readFeatureCollectionMetadataFromNode(
+      /** @type {Element} */
+      source);
+    }
+  };
+  /**
+   * @param {Document} doc Document.
+   * @return {FeatureCollectionMetadata|undefined}
+   *     FeatureCollection metadata.
+   */
+
+
+  WFS.prototype.readFeatureCollectionMetadataFromDocument = function readFeatureCollectionMetadataFromDocument(doc) {
+    for (var n =
+    /** @type {Node} */
+    doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        return this.readFeatureCollectionMetadataFromNode(
+        /** @type {Element} */
+        n);
+      }
+    }
+
+    return undefined;
+  };
+  /**
+   * @param {Element} node Node.
+   * @return {FeatureCollectionMetadata|undefined}
+   *     FeatureCollection metadata.
+   */
+
+
+  WFS.prototype.readFeatureCollectionMetadataFromNode = function readFeatureCollectionMetadataFromNode(node) {
+    var result = {};
+    var value = (0, _xsd.readNonNegativeIntegerString)(node.getAttribute('numberOfFeatures'));
+    result['numberOfFeatures'] = value;
+    return (0, _xml.pushParseAndPop)(
+    /** @type {FeatureCollectionMetadata} */
+    result, FEATURE_COLLECTION_PARSERS, node, [], this.gmlFormat_);
+  };
+  /**
+   * @param {Document} doc Document.
+   * @return {TransactionResponse|undefined} Transaction response.
+   */
+
+
+  WFS.prototype.readTransactionResponseFromDocument = function readTransactionResponseFromDocument(doc) {
+    for (var n =
+    /** @type {Node} */
+    doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        return this.readTransactionResponseFromNode(
+        /** @type {Element} */
+        n);
+      }
+    }
+
+    return undefined;
+  };
+  /**
+   * @param {Element} node Node.
+   * @return {TransactionResponse|undefined} Transaction response.
+   */
+
+
+  WFS.prototype.readTransactionResponseFromNode = function readTransactionResponseFromNode(node) {
+    return (0, _xml.pushParseAndPop)(
+    /** @type {TransactionResponse} */
+    {}, TRANSACTION_RESPONSE_PARSERS, node, []);
+  };
+  /**
+   * Encode format as WFS `GetFeature` and return the Node.
+   *
+   * @param {WriteGetFeatureOptions} options Options.
+   * @return {Node} Result.
+   * @api
+   */
+
+
+  WFS.prototype.writeGetFeature = function writeGetFeature$1(options) {
+    var node = (0, _xml.createElementNS)(WFSNS, 'GetFeature');
+    node.setAttribute('service', 'WFS');
+    node.setAttribute('version', '1.1.0');
+    var filter;
+
+    if (options) {
+      if (options.handle) {
+        node.setAttribute('handle', options.handle);
+      }
+
+      if (options.outputFormat) {
+        node.setAttribute('outputFormat', options.outputFormat);
+      }
+
+      if (options.maxFeatures !== undefined) {
+        node.setAttribute('maxFeatures', String(options.maxFeatures));
+      }
+
+      if (options.resultType) {
+        node.setAttribute('resultType', options.resultType);
+      }
+
+      if (options.startIndex !== undefined) {
+        node.setAttribute('startIndex', String(options.startIndex));
+      }
+
+      if (options.count !== undefined) {
+        node.setAttribute('count', String(options.count));
+      }
+
+      if (options.viewParams !== undefined) {
+        node.setAttribute('viewParams ', options.viewParams);
+      }
+
+      filter = options.filter;
+
+      if (options.bbox) {
+        (0, _asserts.assert)(options.geometryName, 12); // `options.geometryName` must also be provided when `options.bbox` is set
+
+        var bbox = (0, _filter.bbox)(
+        /** @type {string} */
+        options.geometryName, options.bbox, options.srsName);
+
+        if (filter) {
+          // if bbox and filter are both set, combine the two into a single filter
+          filter = (0, _filter.and)(filter, bbox);
+        } else {
+          filter = bbox;
+        }
+      }
+    }
+
+    node.setAttributeNS(_xml.XML_SCHEMA_INSTANCE_URI, 'xsi:schemaLocation', this.schemaLocation_);
+    /** @type {import("../xml.js").NodeStackItem} */
+
+    var context = {
+      node: node
+    };
+    (0, _obj.assign)(context, {
+      'srsName': options.srsName,
+      'featureNS': options.featureNS ? options.featureNS : this.featureNS_,
+      'featurePrefix': options.featurePrefix,
+      'geometryName': options.geometryName,
+      'filter': filter,
+      'propertyNames': options.propertyNames ? options.propertyNames : []
+    });
+    (0, _asserts.assert)(Array.isArray(options.featureTypes), 11); // `options.featureTypes` should be an Array
+
+    writeGetFeature(node,
+    /** @type {!Array<string>} */
+    options.featureTypes, [context]);
+    return node;
+  };
+  /**
+   * Encode format as WFS `Transaction` and return the Node.
+   *
+   * @param {Array<import("../Feature.js").default>} inserts The features to insert.
+   * @param {Array<import("../Feature.js").default>} updates The features to update.
+   * @param {Array<import("../Feature.js").default>} deletes The features to delete.
+   * @param {WriteTransactionOptions} options Write options.
+   * @return {Node} Result.
+   * @api
+   */
+
+
+  WFS.prototype.writeTransaction = function writeTransaction(inserts, updates, deletes, options) {
+    var objectStack = [];
+    var node = (0, _xml.createElementNS)(WFSNS, 'Transaction');
+    var version = options.version ? options.version : DEFAULT_VERSION;
+    var gmlVersion = version === '1.0.0' ? 2 : 3;
+    node.setAttribute('service', 'WFS');
+    node.setAttribute('version', version);
+    var baseObj;
+    /** @type {import("../xml.js").NodeStackItem} */
+
+    var obj;
+
+    if (options) {
+      baseObj = options.gmlOptions ? options.gmlOptions : {};
+
+      if (options.handle) {
+        node.setAttribute('handle', options.handle);
+      }
+    }
+
+    var schemaLocation = SCHEMA_LOCATIONS[version];
+    node.setAttributeNS(_xml.XML_SCHEMA_INSTANCE_URI, 'xsi:schemaLocation', schemaLocation);
+    var featurePrefix = options.featurePrefix ? options.featurePrefix : FEATURE_PREFIX;
+
+    if (inserts) {
+      obj = (0, _obj.assign)({
+        node: node
+      }, {
+        'featureNS': options.featureNS,
+        'featureType': options.featureType,
+        'featurePrefix': featurePrefix,
+        'gmlVersion': gmlVersion,
+        'hasZ': options.hasZ,
+        'srsName': options.srsName
+      });
+      (0, _obj.assign)(obj, baseObj);
+      (0, _xml.pushSerializeAndPop)(obj, TRANSACTION_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)('Insert'), inserts, objectStack);
+    }
+
+    if (updates) {
+      obj = (0, _obj.assign)({
+        node: node
+      }, {
+        'featureNS': options.featureNS,
+        'featureType': options.featureType,
+        'featurePrefix': featurePrefix,
+        'gmlVersion': gmlVersion,
+        'hasZ': options.hasZ,
+        'srsName': options.srsName
+      });
+      (0, _obj.assign)(obj, baseObj);
+      (0, _xml.pushSerializeAndPop)(obj, TRANSACTION_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)('Update'), updates, objectStack);
+    }
+
+    if (deletes) {
+      (0, _xml.pushSerializeAndPop)({
+        node: node,
+        'featureNS': options.featureNS,
+        'featureType': options.featureType,
+        'featurePrefix': featurePrefix,
+        'gmlVersion': gmlVersion,
+        'srsName': options.srsName
+      }, TRANSACTION_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)('Delete'), deletes, objectStack);
+    }
+
+    if (options.nativeElements) {
+      (0, _xml.pushSerializeAndPop)({
+        node: node,
+        'featureNS': options.featureNS,
+        'featureType': options.featureType,
+        'featurePrefix': featurePrefix,
+        'gmlVersion': gmlVersion,
+        'srsName': options.srsName
+      }, TRANSACTION_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)('Native'), options.nativeElements, objectStack);
+    }
+
+    return node;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WFS.prototype.readProjectionFromDocument = function readProjectionFromDocument(doc) {
+    for (var n =
+    /** @type {Node} */
+    doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        return this.readProjectionFromNode(n);
+      }
+    }
+
+    return null;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WFS.prototype.readProjectionFromNode = function readProjectionFromNode(node) {
+    if (node.firstElementChild && node.firstElementChild.firstElementChild) {
+      node = node.firstElementChild.firstElementChild;
+
+      for (var n = node.firstElementChild; n; n = n.nextElementSibling) {
+        if (!(n.childNodes.length === 0 || n.childNodes.length === 1 && n.firstChild.nodeType === 3)) {
+          var objectStack = [{}];
+          this.gmlFormat_.readGeometryElement(n, objectStack);
+          return (0, _proj.get)(objectStack.pop().srsName);
+        }
+      }
+    }
+
+    return null;
+  };
+
+  return WFS;
+}(_XMLFeature.default);
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Transaction Summary.
+ */
+
+
+function readTransactionSummary(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, TRANSACTION_SUMMARY_PARSERS, node, objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var OGC_FID_PARSERS = {
+  'http://www.opengis.net/ogc': {
+    'FeatureId': (0, _xml.makeArrayPusher)(function (node, objectStack) {
+      return node.getAttribute('fid');
+    })
+  }
+};
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ */
+
+function fidParser(node, objectStack) {
+  (0, _xml.parseNode)(OGC_FID_PARSERS, node, objectStack);
+}
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var INSERT_RESULTS_PARSERS = {
+  'http://www.opengis.net/wfs': {
+    'Feature': fidParser
+  }
+};
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Array<string>|undefined} Insert results.
+ */
+
+function readInsertResults(node, objectStack) {
+  return (0, _xml.pushParseAndPop)([], INSERT_RESULTS_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {import("../Feature.js").default} feature Feature.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeFeature(node, feature, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  var featureType = context['featureType'];
+  var featureNS = context['featureNS'];
+  var gmlVersion = context['gmlVersion'];
+  var child = (0, _xml.createElementNS)(featureNS, featureType);
+  node.appendChild(child);
+
+  if (gmlVersion === 2) {
+    _GML.default.prototype.writeFeatureElement(child, feature, objectStack);
+  } else {
+    _GML2.default.prototype.writeFeatureElement(child, feature, objectStack);
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @param {number|string} fid Feature identifier.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeOgcFidFilter(node, fid, objectStack) {
+  var filter = (0, _xml.createElementNS)(OGCNS, 'Filter');
+  var child = (0, _xml.createElementNS)(OGCNS, 'FeatureId');
+  filter.appendChild(child);
+  child.setAttribute('fid',
+  /** @type {string} */
+  fid);
+  node.appendChild(filter);
+}
+/**
+ * @param {string|undefined} featurePrefix The prefix of the feature.
+ * @param {string} featureType The type of the feature.
+ * @returns {string} The value of the typeName property.
+ */
+
+
+function getTypeName(featurePrefix, featureType) {
+  featurePrefix = featurePrefix ? featurePrefix : FEATURE_PREFIX;
+  var prefix = featurePrefix + ':'; // The featureType already contains the prefix.
+
+  if (featureType.indexOf(prefix) === 0) {
+    return featureType;
+  } else {
+    return prefix + featureType;
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @param {import("../Feature.js").default} feature Feature.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeDelete(node, feature, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  (0, _asserts.assert)(feature.getId() !== undefined, 26); // Features must have an id set
+
+  var featureType = context['featureType'];
+  var featurePrefix = context['featurePrefix'];
+  var featureNS = context['featureNS'];
+  var typeName = getTypeName(featurePrefix, featureType);
+  node.setAttribute('typeName', typeName);
+  node.setAttributeNS(XMLNS, 'xmlns:' + featurePrefix, featureNS);
+  var fid = feature.getId();
+
+  if (fid !== undefined) {
+    writeOgcFidFilter(node, fid, objectStack);
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @param {import("../Feature.js").default} feature Feature.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeUpdate(node, feature, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  (0, _asserts.assert)(feature.getId() !== undefined, 27); // Features must have an id set
+
+  var featureType = context['featureType'];
+  var featurePrefix = context['featurePrefix'];
+  var featureNS = context['featureNS'];
+  var typeName = getTypeName(featurePrefix, featureType);
+  var geometryName = feature.getGeometryName();
+  node.setAttribute('typeName', typeName);
+  node.setAttributeNS(XMLNS, 'xmlns:' + featurePrefix, featureNS);
+  var fid = feature.getId();
+
+  if (fid !== undefined) {
+    var keys = feature.getKeys();
+    var values = [];
+
+    for (var i = 0, ii = keys.length; i < ii; i++) {
+      var value = feature.get(keys[i]);
+
+      if (value !== undefined) {
+        var name = keys[i];
+
+        if (value && typeof
+        /** @type {?} */
+        value.getSimplifiedGeometry === 'function') {
+          name = geometryName;
+        }
+
+        values.push({
+          name: name,
+          value: value
+        });
+      }
+    }
+
+    (0, _xml.pushSerializeAndPop)(
+    /** @type {import("../xml.js").NodeStackItem} */
+    {
+      'gmlVersion': context['gmlVersion'],
+      node: node,
+      'hasZ': context['hasZ'],
+      'srsName': context['srsName']
+    }, TRANSACTION_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)('Property'), values, objectStack);
+    writeOgcFidFilter(node, fid, objectStack);
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @param {Object} pair Property name and value.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeProperty(node, pair, objectStack) {
+  var name = (0, _xml.createElementNS)(WFSNS, 'Name');
+  var context = objectStack[objectStack.length - 1];
+  var gmlVersion = context['gmlVersion'];
+  node.appendChild(name);
+  (0, _xsd.writeStringTextNode)(name, pair.name);
+
+  if (pair.value !== undefined && pair.value !== null) {
+    var value = (0, _xml.createElementNS)(WFSNS, 'Value');
+    node.appendChild(value);
+
+    if (pair.value && typeof
+    /** @type {?} */
+    pair.value.getSimplifiedGeometry === 'function') {
+      if (gmlVersion === 2) {
+        _GML.default.prototype.writeGeometryElement(value, pair.value, objectStack);
+      } else {
+        _GML2.default.prototype.writeGeometryElement(value, pair.value, objectStack);
+      }
+    } else {
+      (0, _xsd.writeStringTextNode)(value, pair.value);
+    }
+  }
+}
+/**
+ * @param {Element} node Node.
+ * @param {{vendorId: string, safeToIgnore: boolean, value: string}} nativeElement The native element.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeNative(node, nativeElement, objectStack) {
+  if (nativeElement.vendorId) {
+    node.setAttribute('vendorId', nativeElement.vendorId);
+  }
+
+  if (nativeElement.safeToIgnore !== undefined) {
+    node.setAttribute('safeToIgnore', String(nativeElement.safeToIgnore));
+  }
+
+  if (nativeElement.value !== undefined) {
+    (0, _xsd.writeStringTextNode)(node, nativeElement.value);
+  }
+}
+/**
+ * @type {Object<string, Object<string, import("../xml.js").Serializer>>}
+ */
+
+
+var GETFEATURE_SERIALIZERS = {
+  'http://www.opengis.net/wfs': {
+    'Query': (0, _xml.makeChildAppender)(writeQuery)
+  },
+  'http://www.opengis.net/ogc': {
+    'During': (0, _xml.makeChildAppender)(writeDuringFilter),
+    'And': (0, _xml.makeChildAppender)(writeLogicalFilter),
+    'Or': (0, _xml.makeChildAppender)(writeLogicalFilter),
+    'Not': (0, _xml.makeChildAppender)(writeNotFilter),
+    'BBOX': (0, _xml.makeChildAppender)(writeBboxFilter),
+    'Contains': (0, _xml.makeChildAppender)(writeContainsFilter),
+    'Intersects': (0, _xml.makeChildAppender)(writeIntersectsFilter),
+    'Within': (0, _xml.makeChildAppender)(writeWithinFilter),
+    'PropertyIsEqualTo': (0, _xml.makeChildAppender)(writeComparisonFilter),
+    'PropertyIsNotEqualTo': (0, _xml.makeChildAppender)(writeComparisonFilter),
+    'PropertyIsLessThan': (0, _xml.makeChildAppender)(writeComparisonFilter),
+    'PropertyIsLessThanOrEqualTo': (0, _xml.makeChildAppender)(writeComparisonFilter),
+    'PropertyIsGreaterThan': (0, _xml.makeChildAppender)(writeComparisonFilter),
+    'PropertyIsGreaterThanOrEqualTo': (0, _xml.makeChildAppender)(writeComparisonFilter),
+    'PropertyIsNull': (0, _xml.makeChildAppender)(writeIsNullFilter),
+    'PropertyIsBetween': (0, _xml.makeChildAppender)(writeIsBetweenFilter),
+    'PropertyIsLike': (0, _xml.makeChildAppender)(writeIsLikeFilter)
+  }
+};
+/**
+ * @param {Element} node Node.
+ * @param {string} featureType Feature type.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+function writeQuery(node, featureType, objectStack) {
+  var context =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  var featurePrefix = context['featurePrefix'];
+  var featureNS = context['featureNS'];
+  var propertyNames = context['propertyNames'];
+  var srsName = context['srsName'];
+  var typeName; // If feature prefix is not defined, we must not use the default prefix.
+
+  if (featurePrefix) {
+    typeName = getTypeName(featurePrefix, featureType);
+  } else {
+    typeName = featureType;
+  }
+
+  node.setAttribute('typeName', typeName);
+
+  if (srsName) {
+    node.setAttribute('srsName', srsName);
+  }
+
+  if (featureNS) {
+    node.setAttributeNS(XMLNS, 'xmlns:' + featurePrefix, featureNS);
+  }
+
+  var item =
+  /** @type {import("../xml.js").NodeStackItem} */
+  (0, _obj.assign)({}, context);
+  item.node = node;
+  (0, _xml.pushSerializeAndPop)(item, QUERY_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)('PropertyName'), propertyNames, objectStack);
+  var filter = context['filter'];
+
+  if (filter) {
+    var child = (0, _xml.createElementNS)(OGCNS, 'Filter');
+    node.appendChild(child);
+    writeFilterCondition(child, filter, objectStack);
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/Filter.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeFilterCondition(node, filter, objectStack) {
+  /** @type {import("../xml.js").NodeStackItem} */
+  var item = {
+    node: node
+  };
+  (0, _xml.pushSerializeAndPop)(item, GETFEATURE_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)(filter.getTagName()), [filter], objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/Bbox.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeBboxFilter(node, filter, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  context['srsName'] = filter.srsName;
+  writeOgcPropertyName(node, filter.geometryName);
+
+  _GML2.default.prototype.writeGeometryElement(node, filter.extent, objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/Contains.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeContainsFilter(node, filter, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  context['srsName'] = filter.srsName;
+  writeOgcPropertyName(node, filter.geometryName);
+
+  _GML2.default.prototype.writeGeometryElement(node, filter.geometry, objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/Intersects.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeIntersectsFilter(node, filter, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  context['srsName'] = filter.srsName;
+  writeOgcPropertyName(node, filter.geometryName);
+
+  _GML2.default.prototype.writeGeometryElement(node, filter.geometry, objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/Within.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeWithinFilter(node, filter, objectStack) {
+  var context = objectStack[objectStack.length - 1];
+  context['srsName'] = filter.srsName;
+  writeOgcPropertyName(node, filter.geometryName);
+
+  _GML2.default.prototype.writeGeometryElement(node, filter.geometry, objectStack);
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/During.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeDuringFilter(node, filter, objectStack) {
+  var valueReference = (0, _xml.createElementNS)(FESNS, 'ValueReference');
+  (0, _xsd.writeStringTextNode)(valueReference, filter.propertyName);
+  node.appendChild(valueReference);
+  var timePeriod = (0, _xml.createElementNS)(_GMLBase.GMLNS, 'TimePeriod');
+  node.appendChild(timePeriod);
+  var begin = (0, _xml.createElementNS)(_GMLBase.GMLNS, 'begin');
+  timePeriod.appendChild(begin);
+  writeTimeInstant(begin, filter.begin);
+  var end = (0, _xml.createElementNS)(_GMLBase.GMLNS, 'end');
+  timePeriod.appendChild(end);
+  writeTimeInstant(end, filter.end);
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/LogicalNary.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeLogicalFilter(node, filter, objectStack) {
+  /** @type {import("../xml.js").NodeStackItem} */
+  var item = {
+    node: node
+  };
+  var conditions = filter.conditions;
+
+  for (var i = 0, ii = conditions.length; i < ii; ++i) {
+    var condition = conditions[i];
+    (0, _xml.pushSerializeAndPop)(item, GETFEATURE_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)(condition.getTagName()), [condition], objectStack);
+  }
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/Not.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeNotFilter(node, filter, objectStack) {
+  /** @type {import("../xml.js").NodeStackItem} */
+  var item = {
+    node: node
+  };
+  var condition = filter.condition;
+  (0, _xml.pushSerializeAndPop)(item, GETFEATURE_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)(condition.getTagName()), [condition], objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {import("./filter/ComparisonBinary.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeComparisonFilter(node, filter, objectStack) {
+  if (filter.matchCase !== undefined) {
+    node.setAttribute('matchCase', filter.matchCase.toString());
+  }
+
+  writeOgcPropertyName(node, filter.propertyName);
+  writeOgcLiteral(node, '' + filter.expression);
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/IsNull.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeIsNullFilter(node, filter, objectStack) {
+  writeOgcPropertyName(node, filter.propertyName);
+}
+/**
+ * @param {Node} node Node.
+ * @param {import("./filter/IsBetween.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeIsBetweenFilter(node, filter, objectStack) {
+  writeOgcPropertyName(node, filter.propertyName);
+  var lowerBoundary = (0, _xml.createElementNS)(OGCNS, 'LowerBoundary');
+  node.appendChild(lowerBoundary);
+  writeOgcLiteral(lowerBoundary, '' + filter.lowerBoundary);
+  var upperBoundary = (0, _xml.createElementNS)(OGCNS, 'UpperBoundary');
+  node.appendChild(upperBoundary);
+  writeOgcLiteral(upperBoundary, '' + filter.upperBoundary);
+}
+/**
+ * @param {Element} node Node.
+ * @param {import("./filter/IsLike.js").default} filter Filter.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeIsLikeFilter(node, filter, objectStack) {
+  node.setAttribute('wildCard', filter.wildCard);
+  node.setAttribute('singleChar', filter.singleChar);
+  node.setAttribute('escapeChar', filter.escapeChar);
+
+  if (filter.matchCase !== undefined) {
+    node.setAttribute('matchCase', filter.matchCase.toString());
+  }
+
+  writeOgcPropertyName(node, filter.propertyName);
+  writeOgcLiteral(node, '' + filter.pattern);
+}
+/**
+ * @param {string} tagName Tag name.
+ * @param {Node} node Node.
+ * @param {string} value Value.
+ */
+
+
+function writeOgcExpression(tagName, node, value) {
+  var property = (0, _xml.createElementNS)(OGCNS, tagName);
+  (0, _xsd.writeStringTextNode)(property, value);
+  node.appendChild(property);
+}
+/**
+ * @param {Node} node Node.
+ * @param {string} value PropertyName value.
+ */
+
+
+function writeOgcPropertyName(node, value) {
+  writeOgcExpression('PropertyName', node, value);
+}
+/**
+ * @param {Node} node Node.
+ * @param {string} value PropertyName value.
+ */
+
+
+function writeOgcLiteral(node, value) {
+  writeOgcExpression('Literal', node, value);
+}
+/**
+ * @param {Node} node Node.
+ * @param {string} time PropertyName value.
+ */
+
+
+function writeTimeInstant(node, time) {
+  var timeInstant = (0, _xml.createElementNS)(_GMLBase.GMLNS, 'TimeInstant');
+  node.appendChild(timeInstant);
+  var timePosition = (0, _xml.createElementNS)(_GMLBase.GMLNS, 'timePosition');
+  timeInstant.appendChild(timePosition);
+  (0, _xsd.writeStringTextNode)(timePosition, time);
+}
+/**
+ * Encode filter as WFS `Filter` and return the Node.
+ *
+ * @param {import("./filter/Filter.js").default} filter Filter.
+ * @return {Node} Result.
+ * @api
+ */
+
+
+function writeFilter(filter) {
+  var child = (0, _xml.createElementNS)(OGCNS, 'Filter');
+  writeFilterCondition(child, filter, []);
+  return child;
+}
+/**
+ * @param {Node} node Node.
+ * @param {Array<string>} featureTypes Feature types.
+ * @param {Array<*>} objectStack Node stack.
+ */
+
+
+function writeGetFeature(node, featureTypes, objectStack) {
+  var context =
+  /** @type {Object} */
+  objectStack[objectStack.length - 1];
+  var item =
+  /** @type {import("../xml.js").NodeStackItem} */
+  (0, _obj.assign)({}, context);
+  item.node = node;
+  (0, _xml.pushSerializeAndPop)(item, GETFEATURE_SERIALIZERS, (0, _xml.makeSimpleNodeFactory)('Query'), featureTypes, objectStack);
+}
+
+var _default = WFS;
+exports.default = _default;
+},{"../asserts.js":"../node_modules/ol/asserts.js","./GML2.js":"../node_modules/ol/format/GML2.js","./GML3.js":"../node_modules/ol/format/GML3.js","./GMLBase.js":"../node_modules/ol/format/GMLBase.js","./filter.js":"../node_modules/ol/format/filter.js","./XMLFeature.js":"../node_modules/ol/format/XMLFeature.js","./xsd.js":"../node_modules/ol/format/xsd.js","../obj.js":"../node_modules/ol/obj.js","../proj.js":"../node_modules/ol/proj.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/WKT.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Feature = _interopRequireDefault(require("../Feature.js"));
+
+var _Feature2 = require("./Feature.js");
+
+var _TextFeature = _interopRequireDefault(require("./TextFeature.js"));
+
+var _GeometryCollection = _interopRequireDefault(require("../geom/GeometryCollection.js"));
+
+var _GeometryType = _interopRequireDefault(require("../geom/GeometryType.js"));
+
+var _GeometryLayout = _interopRequireDefault(require("../geom/GeometryLayout.js"));
+
+var _LineString = _interopRequireDefault(require("../geom/LineString.js"));
+
+var _MultiLineString = _interopRequireDefault(require("../geom/MultiLineString.js"));
+
+var _MultiPoint = _interopRequireDefault(require("../geom/MultiPoint.js"));
+
+var _MultiPolygon = _interopRequireDefault(require("../geom/MultiPolygon.js"));
+
+var _Point = _interopRequireDefault(require("../geom/Point.js"));
+
+var _Polygon = _interopRequireDefault(require("../geom/Polygon.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/WKT
+ */
+
+/**
+ * Geometry constructors
+ * @enum {function (new:import("../geom/Geometry.js").default, Array, GeometryLayout)}
+ */
+var GeometryConstructor = {
+  'POINT': _Point.default,
+  'LINESTRING': _LineString.default,
+  'POLYGON': _Polygon.default,
+  'MULTIPOINT': _MultiPoint.default,
+  'MULTILINESTRING': _MultiLineString.default,
+  'MULTIPOLYGON': _MultiPolygon.default
+};
+/**
+ * @typedef {Object} Options
+ * @property {boolean} [splitCollection=false] Whether to split GeometryCollections into
+ * multiple features on reading.
+ */
+
+/**
+ * @typedef {Object} Token
+ * @property {number} type
+ * @property {number|string} [value]
+ * @property {number} position
+ */
+
+/**
+ * @const
+ * @type {string}
+ */
+
+var EMPTY = 'EMPTY';
+/**
+ * @const
+ * @type {string}
+ */
+
+var Z = 'Z';
+/**
+ * @const
+ * @type {string}
+ */
+
+var M = 'M';
+/**
+ * @const
+ * @type {string}
+ */
+
+var ZM = 'ZM';
+/**
+ * @const
+ * @enum {number}
+ */
+
+var TokenType = {
+  TEXT: 1,
+  LEFT_PAREN: 2,
+  RIGHT_PAREN: 3,
+  NUMBER: 4,
+  COMMA: 5,
+  EOF: 6
+};
+/**
+ * @const
+ * @type {Object<string, string>}
+ */
+
+var WKTGeometryType = {};
+
+for (var type in _GeometryType.default) {
+  WKTGeometryType[type] = _GeometryType.default[type].toUpperCase();
+}
+/**
+ * Class to tokenize a WKT string.
+ */
+
+
+var Lexer = function Lexer(wkt) {
+  /**
+   * @type {string}
+   */
+  this.wkt = wkt;
+  /**
+   * @type {number}
+   * @private
+   */
+
+  this.index_ = -1;
+};
+/**
+ * @param {string} c Character.
+ * @return {boolean} Whether the character is alphabetic.
+ * @private
+ */
+
+
+Lexer.prototype.isAlpha_ = function isAlpha_(c) {
+  return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z';
+};
+/**
+ * @param {string} c Character.
+ * @param {boolean=} opt_decimal Whether the string number
+ *   contains a dot, i.e. is a decimal number.
+ * @return {boolean} Whether the character is numeric.
+ * @private
+ */
+
+
+Lexer.prototype.isNumeric_ = function isNumeric_(c, opt_decimal) {
+  var decimal = opt_decimal !== undefined ? opt_decimal : false;
+  return c >= '0' && c <= '9' || c == '.' && !decimal;
+};
+/**
+ * @param {string} c Character.
+ * @return {boolean} Whether the character is whitespace.
+ * @private
+ */
+
+
+Lexer.prototype.isWhiteSpace_ = function isWhiteSpace_(c) {
+  return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+};
+/**
+ * @return {string} Next string character.
+ * @private
+ */
+
+
+Lexer.prototype.nextChar_ = function nextChar_() {
+  return this.wkt.charAt(++this.index_);
+};
+/**
+ * Fetch and return the next token.
+ * @return {!Token} Next string token.
+ */
+
+
+Lexer.prototype.nextToken = function nextToken() {
+  var c = this.nextChar_();
+  var position = this.index_;
+  /** @type {number|string} */
+
+  var value = c;
+  var type;
+
+  if (c == '(') {
+    type = TokenType.LEFT_PAREN;
+  } else if (c == ',') {
+    type = TokenType.COMMA;
+  } else if (c == ')') {
+    type = TokenType.RIGHT_PAREN;
+  } else if (this.isNumeric_(c) || c == '-') {
+    type = TokenType.NUMBER;
+    value = this.readNumber_();
+  } else if (this.isAlpha_(c)) {
+    type = TokenType.TEXT;
+    value = this.readText_();
+  } else if (this.isWhiteSpace_(c)) {
+    return this.nextToken();
+  } else if (c === '') {
+    type = TokenType.EOF;
+  } else {
+    throw new Error('Unexpected character: ' + c);
+  }
+
+  return {
+    position: position,
+    value: value,
+    type: type
+  };
+};
+/**
+ * @return {number} Numeric token value.
+ * @private
+ */
+
+
+Lexer.prototype.readNumber_ = function readNumber_() {
+  var c;
+  var index = this.index_;
+  var decimal = false;
+  var scientificNotation = false;
+
+  do {
+    if (c == '.') {
+      decimal = true;
+    } else if (c == 'e' || c == 'E') {
+      scientificNotation = true;
+    }
+
+    c = this.nextChar_();
+  } while (this.isNumeric_(c, decimal) || // if we haven't detected a scientific number before, 'e' or 'E'
+  // hint that we should continue to read
+  !scientificNotation && (c == 'e' || c == 'E') || // once we know that we have a scientific number, both '-' and '+'
+  // are allowed
+  scientificNotation && (c == '-' || c == '+'));
+
+  return parseFloat(this.wkt.substring(index, this.index_--));
+};
+/**
+ * @return {string} String token value.
+ * @private
+ */
+
+
+Lexer.prototype.readText_ = function readText_() {
+  var c;
+  var index = this.index_;
+
+  do {
+    c = this.nextChar_();
+  } while (this.isAlpha_(c));
+
+  return this.wkt.substring(index, this.index_--).toUpperCase();
+};
+/**
+ * Class to parse the tokens from the WKT string.
+ */
+
+
+var Parser = function Parser(lexer) {
+  /**
+   * @type {Lexer}
+   * @private
+   */
+  this.lexer_ = lexer;
+  /**
+   * @type {Token}
+   * @private
+   */
+
+  this.token_;
+  /**
+   * @type {GeometryLayout}
+   * @private
+   */
+
+  this.layout_ = _GeometryLayout.default.XY;
+};
+/**
+ * Fetch the next token form the lexer and replace the active token.
+ * @private
+ */
+
+
+Parser.prototype.consume_ = function consume_() {
+  this.token_ = this.lexer_.nextToken();
+};
+/**
+ * Tests if the given type matches the type of the current token.
+ * @param {TokenType} type Token type.
+ * @return {boolean} Whether the token matches the given type.
+ */
+
+
+Parser.prototype.isTokenType = function isTokenType(type) {
+  var isMatch = this.token_.type == type;
+  return isMatch;
+};
+/**
+ * If the given type matches the current token, consume it.
+ * @param {TokenType} type Token type.
+ * @return {boolean} Whether the token matches the given type.
+ */
+
+
+Parser.prototype.match = function match(type) {
+  var isMatch = this.isTokenType(type);
+
+  if (isMatch) {
+    this.consume_();
+  }
+
+  return isMatch;
+};
+/**
+ * Try to parse the tokens provided by the lexer.
+ * @return {import("../geom/Geometry.js").default} The geometry.
+ */
+
+
+Parser.prototype.parse = function parse() {
+  this.consume_();
+  var geometry = this.parseGeometry_();
+  return geometry;
+};
+/**
+ * Try to parse the dimensional info.
+ * @return {GeometryLayout} The layout.
+ * @private
+ */
+
+
+Parser.prototype.parseGeometryLayout_ = function parseGeometryLayout_() {
+  var layout = _GeometryLayout.default.XY;
+  var dimToken = this.token_;
+
+  if (this.isTokenType(TokenType.TEXT)) {
+    var dimInfo = dimToken.value;
+
+    if (dimInfo === Z) {
+      layout = _GeometryLayout.default.XYZ;
+    } else if (dimInfo === M) {
+      layout = _GeometryLayout.default.XYM;
+    } else if (dimInfo === ZM) {
+      layout = _GeometryLayout.default.XYZM;
+    }
+
+    if (layout !== _GeometryLayout.default.XY) {
+      this.consume_();
+    }
+  }
+
+  return layout;
+};
+/**
+ * @return {!Array<import("../geom/Geometry.js").default>} A collection of geometries.
+ * @private
+ */
+
+
+Parser.prototype.parseGeometryCollectionText_ = function parseGeometryCollectionText_() {
+  if (this.match(TokenType.LEFT_PAREN)) {
+    var geometries = [];
+
+    do {
+      geometries.push(this.parseGeometry_());
+    } while (this.match(TokenType.COMMA));
+
+    if (this.match(TokenType.RIGHT_PAREN)) {
+      return geometries;
+    }
+  } else if (this.isEmptyGeometry_()) {
+    return [];
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @return {Array<number>} All values in a point.
+ * @private
+ */
+
+
+Parser.prototype.parsePointText_ = function parsePointText_() {
+  if (this.match(TokenType.LEFT_PAREN)) {
+    var coordinates = this.parsePoint_();
+
+    if (this.match(TokenType.RIGHT_PAREN)) {
+      return coordinates;
+    }
+  } else if (this.isEmptyGeometry_()) {
+    return null;
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @return {!Array<!Array<number>>} All points in a linestring.
+ * @private
+ */
+
+
+Parser.prototype.parseLineStringText_ = function parseLineStringText_() {
+  if (this.match(TokenType.LEFT_PAREN)) {
+    var coordinates = this.parsePointList_();
+
+    if (this.match(TokenType.RIGHT_PAREN)) {
+      return coordinates;
+    }
+  } else if (this.isEmptyGeometry_()) {
+    return [];
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @return {!Array<!Array<!Array<number>>>} All points in a polygon.
+ * @private
+ */
+
+
+Parser.prototype.parsePolygonText_ = function parsePolygonText_() {
+  if (this.match(TokenType.LEFT_PAREN)) {
+    var coordinates = this.parseLineStringTextList_();
+
+    if (this.match(TokenType.RIGHT_PAREN)) {
+      return coordinates;
+    }
+  } else if (this.isEmptyGeometry_()) {
+    return [];
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @return {!Array<!Array<number>>} All points in a multipoint.
+ * @private
+ */
+
+
+Parser.prototype.parseMultiPointText_ = function parseMultiPointText_() {
+  if (this.match(TokenType.LEFT_PAREN)) {
+    var coordinates;
+
+    if (this.token_.type == TokenType.LEFT_PAREN) {
+      coordinates = this.parsePointTextList_();
+    } else {
+      coordinates = this.parsePointList_();
+    }
+
+    if (this.match(TokenType.RIGHT_PAREN)) {
+      return coordinates;
+    }
+  } else if (this.isEmptyGeometry_()) {
+    return [];
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @return {!Array<!Array<!Array<number>>>} All linestring points
+ *                                        in a multilinestring.
+ * @private
+ */
+
+
+Parser.prototype.parseMultiLineStringText_ = function parseMultiLineStringText_() {
+  if (this.match(TokenType.LEFT_PAREN)) {
+    var coordinates = this.parseLineStringTextList_();
+
+    if (this.match(TokenType.RIGHT_PAREN)) {
+      return coordinates;
+    }
+  } else if (this.isEmptyGeometry_()) {
+    return [];
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @return {!Array<!Array<!Array<!Array<number>>>>} All polygon points in a multipolygon.
+ * @private
+ */
+
+
+Parser.prototype.parseMultiPolygonText_ = function parseMultiPolygonText_() {
+  if (this.match(TokenType.LEFT_PAREN)) {
+    var coordinates = this.parsePolygonTextList_();
+
+    if (this.match(TokenType.RIGHT_PAREN)) {
+      return coordinates;
+    }
+  } else if (this.isEmptyGeometry_()) {
+    return [];
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @return {!Array<number>} A point.
+ * @private
+ */
+
+
+Parser.prototype.parsePoint_ = function parsePoint_() {
+  var coordinates = [];
+  var dimensions = this.layout_.length;
+
+  for (var i = 0; i < dimensions; ++i) {
+    var token = this.token_;
+
+    if (this.match(TokenType.NUMBER)) {
+      coordinates.push(
+      /** @type {number} */
+      token.value);
+    } else {
+      break;
+    }
+  }
+
+  if (coordinates.length == dimensions) {
+    return coordinates;
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @return {!Array<!Array<number>>} An array of points.
+ * @private
+ */
+
+
+Parser.prototype.parsePointList_ = function parsePointList_() {
+  var coordinates = [this.parsePoint_()];
+
+  while (this.match(TokenType.COMMA)) {
+    coordinates.push(this.parsePoint_());
+  }
+
+  return coordinates;
+};
+/**
+ * @return {!Array<!Array<number>>} An array of points.
+ * @private
+ */
+
+
+Parser.prototype.parsePointTextList_ = function parsePointTextList_() {
+  var coordinates = [this.parsePointText_()];
+
+  while (this.match(TokenType.COMMA)) {
+    coordinates.push(this.parsePointText_());
+  }
+
+  return coordinates;
+};
+/**
+ * @return {!Array<!Array<!Array<number>>>} An array of points.
+ * @private
+ */
+
+
+Parser.prototype.parseLineStringTextList_ = function parseLineStringTextList_() {
+  var coordinates = [this.parseLineStringText_()];
+
+  while (this.match(TokenType.COMMA)) {
+    coordinates.push(this.parseLineStringText_());
+  }
+
+  return coordinates;
+};
+/**
+ * @return {!Array<!Array<!Array<!Array<number>>>>} An array of points.
+ * @private
+ */
+
+
+Parser.prototype.parsePolygonTextList_ = function parsePolygonTextList_() {
+  var coordinates = [this.parsePolygonText_()];
+
+  while (this.match(TokenType.COMMA)) {
+    coordinates.push(this.parsePolygonText_());
+  }
+
+  return coordinates;
+};
+/**
+ * @return {boolean} Whether the token implies an empty geometry.
+ * @private
+ */
+
+
+Parser.prototype.isEmptyGeometry_ = function isEmptyGeometry_() {
+  var isEmpty = this.isTokenType(TokenType.TEXT) && this.token_.value == EMPTY;
+
+  if (isEmpty) {
+    this.consume_();
+  }
+
+  return isEmpty;
+};
+/**
+ * Create an error message for an unexpected token error.
+ * @return {string} Error message.
+ * @private
+ */
+
+
+Parser.prototype.formatErrorMessage_ = function formatErrorMessage_() {
+  return 'Unexpected `' + this.token_.value + '` at position ' + this.token_.position + ' in `' + this.lexer_.wkt + '`';
+};
+/**
+ * @return {!import("../geom/Geometry.js").default} The geometry.
+ * @private
+ */
+
+
+Parser.prototype.parseGeometry_ = function parseGeometry_() {
+  var token = this.token_;
+
+  if (this.match(TokenType.TEXT)) {
+    var geomType = token.value;
+    this.layout_ = this.parseGeometryLayout_();
+
+    if (geomType == 'GEOMETRYCOLLECTION') {
+      var geometries = this.parseGeometryCollectionText_();
+      return new _GeometryCollection.default(geometries);
+    } else {
+      var ctor = GeometryConstructor[geomType];
+
+      if (!ctor) {
+        throw new Error('Invalid geometry type: ' + geomType);
+      }
+
+      var coordinates;
+
+      switch (geomType) {
+        case 'POINT':
+          {
+            coordinates = this.parsePointText_();
+            break;
+          }
+
+        case 'LINESTRING':
+          {
+            coordinates = this.parseLineStringText_();
+            break;
+          }
+
+        case 'POLYGON':
+          {
+            coordinates = this.parsePolygonText_();
+            break;
+          }
+
+        case 'MULTIPOINT':
+          {
+            coordinates = this.parseMultiPointText_();
+            break;
+          }
+
+        case 'MULTILINESTRING':
+          {
+            coordinates = this.parseMultiLineStringText_();
+            break;
+          }
+
+        case 'MULTIPOLYGON':
+          {
+            coordinates = this.parseMultiPolygonText_();
+            break;
+          }
+
+        default:
+          {
+            throw new Error('Invalid geometry type: ' + geomType);
+          }
+      }
+
+      if (!coordinates) {
+        if (ctor === GeometryConstructor['POINT']) {
+          coordinates = [NaN, NaN];
+        } else {
+          coordinates = [];
+        }
+      }
+
+      return new ctor(coordinates, this.layout_);
+    }
+  }
+
+  throw new Error(this.formatErrorMessage_());
+};
+/**
+ * @classdesc
+ * Geometry format for reading and writing data in the `WellKnownText` (WKT)
+ * format.
+ *
+ * @api
+ */
+
+
+var WKT =
+/*@__PURE__*/
+function (TextFeature) {
+  function WKT(opt_options) {
+    TextFeature.call(this);
+    var options = opt_options ? opt_options : {};
+    /**
+     * Split GeometryCollection into multiple features.
+     * @type {boolean}
+     * @private
+     */
+
+    this.splitCollection_ = options.splitCollection !== undefined ? options.splitCollection : false;
+  }
+
+  if (TextFeature) WKT.__proto__ = TextFeature;
+  WKT.prototype = Object.create(TextFeature && TextFeature.prototype);
+  WKT.prototype.constructor = WKT;
+  /**
+   * Parse a WKT string.
+   * @param {string} wkt WKT string.
+   * @return {import("../geom/Geometry.js").default|undefined}
+   *     The geometry created.
+   * @private
+   */
+
+  WKT.prototype.parse_ = function parse_(wkt) {
+    var lexer = new Lexer(wkt);
+    var parser = new Parser(lexer);
+    return parser.parse();
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WKT.prototype.readFeatureFromText = function readFeatureFromText(text, opt_options) {
+    var geom = this.readGeometryFromText(text, opt_options);
+
+    if (geom) {
+      var feature = new _Feature.default();
+      feature.setGeometry(geom);
+      return feature;
+    }
+
+    return null;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WKT.prototype.readFeaturesFromText = function readFeaturesFromText(text, opt_options) {
+    var geometries = [];
+    var geometry = this.readGeometryFromText(text, opt_options);
+
+    if (this.splitCollection_ && geometry.getType() == _GeometryType.default.GEOMETRY_COLLECTION) {
+      geometries =
+      /** @type {GeometryCollection} */
+      geometry.getGeometriesArray();
+    } else {
+      geometries = [geometry];
+    }
+
+    var features = [];
+
+    for (var i = 0, ii = geometries.length; i < ii; ++i) {
+      var feature = new _Feature.default();
+      feature.setGeometry(geometries[i]);
+      features.push(feature);
+    }
+
+    return features;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WKT.prototype.readGeometryFromText = function readGeometryFromText(text, opt_options) {
+    var geometry = this.parse_(text);
+
+    if (geometry) {
+      return (
+        /** @type {import("../geom/Geometry.js").default} */
+        (0, _Feature2.transformWithOptions)(geometry, false, opt_options)
+      );
+    } else {
+      return null;
+    }
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WKT.prototype.writeFeatureText = function writeFeatureText(feature, opt_options) {
+    var geometry = feature.getGeometry();
+
+    if (geometry) {
+      return this.writeGeometryText(geometry, opt_options);
+    }
+
+    return '';
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WKT.prototype.writeFeaturesText = function writeFeaturesText(features, opt_options) {
+    if (features.length == 1) {
+      return this.writeFeatureText(features[0], opt_options);
+    }
+
+    var geometries = [];
+
+    for (var i = 0, ii = features.length; i < ii; ++i) {
+      geometries.push(features[i].getGeometry());
+    }
+
+    var collection = new _GeometryCollection.default(geometries);
+    return this.writeGeometryText(collection, opt_options);
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WKT.prototype.writeGeometryText = function writeGeometryText(geometry, opt_options) {
+    return encode(
+    /** @type {import("../geom/Geometry.js").default} */
+    (0, _Feature2.transformWithOptions)(geometry, true, opt_options));
+  };
+
+  return WKT;
+}(_TextFeature.default);
+/**
+ * @param {Point} geom Point geometry.
+ * @return {string} Coordinates part of Point as WKT.
+ */
+
+
+function encodePointGeometry(geom) {
+  var coordinates = geom.getCoordinates();
+
+  if (coordinates.length === 0) {
+    return '';
+  }
+
+  return coordinates.join(' ');
+}
+/**
+ * @param {MultiPoint} geom MultiPoint geometry.
+ * @return {string} Coordinates part of MultiPoint as WKT.
+ */
+
+
+function encodeMultiPointGeometry(geom) {
+  var array = [];
+  var components = geom.getPoints();
+
+  for (var i = 0, ii = components.length; i < ii; ++i) {
+    array.push('(' + encodePointGeometry(components[i]) + ')');
+  }
+
+  return array.join(',');
+}
+/**
+ * @param {GeometryCollection} geom GeometryCollection geometry.
+ * @return {string} Coordinates part of GeometryCollection as WKT.
+ */
+
+
+function encodeGeometryCollectionGeometry(geom) {
+  var array = [];
+  var geoms = geom.getGeometries();
+
+  for (var i = 0, ii = geoms.length; i < ii; ++i) {
+    array.push(encode(geoms[i]));
+  }
+
+  return array.join(',');
+}
+/**
+ * @param {LineString|import("../geom/LinearRing.js").default} geom LineString geometry.
+ * @return {string} Coordinates part of LineString as WKT.
+ */
+
+
+function encodeLineStringGeometry(geom) {
+  var coordinates = geom.getCoordinates();
+  var array = [];
+
+  for (var i = 0, ii = coordinates.length; i < ii; ++i) {
+    array.push(coordinates[i].join(' '));
+  }
+
+  return array.join(',');
+}
+/**
+ * @param {MultiLineString} geom MultiLineString geometry.
+ * @return {string} Coordinates part of MultiLineString as WKT.
+ */
+
+
+function encodeMultiLineStringGeometry(geom) {
+  var array = [];
+  var components = geom.getLineStrings();
+
+  for (var i = 0, ii = components.length; i < ii; ++i) {
+    array.push('(' + encodeLineStringGeometry(components[i]) + ')');
+  }
+
+  return array.join(',');
+}
+/**
+ * @param {Polygon} geom Polygon geometry.
+ * @return {string} Coordinates part of Polygon as WKT.
+ */
+
+
+function encodePolygonGeometry(geom) {
+  var array = [];
+  var rings = geom.getLinearRings();
+
+  for (var i = 0, ii = rings.length; i < ii; ++i) {
+    array.push('(' + encodeLineStringGeometry(rings[i]) + ')');
+  }
+
+  return array.join(',');
+}
+/**
+ * @param {MultiPolygon} geom MultiPolygon geometry.
+ * @return {string} Coordinates part of MultiPolygon as WKT.
+ */
+
+
+function encodeMultiPolygonGeometry(geom) {
+  var array = [];
+  var components = geom.getPolygons();
+
+  for (var i = 0, ii = components.length; i < ii; ++i) {
+    array.push('(' + encodePolygonGeometry(components[i]) + ')');
+  }
+
+  return array.join(',');
+}
+/**
+ * @param {import("../geom/SimpleGeometry.js").default} geom SimpleGeometry geometry.
+ * @return {string} Potential dimensional information for WKT type.
+ */
+
+
+function encodeGeometryLayout(geom) {
+  var layout = geom.getLayout();
+  var dimInfo = '';
+
+  if (layout === _GeometryLayout.default.XYZ || layout === _GeometryLayout.default.XYZM) {
+    dimInfo += Z;
+  }
+
+  if (layout === _GeometryLayout.default.XYM || layout === _GeometryLayout.default.XYZM) {
+    dimInfo += M;
+  }
+
+  return dimInfo;
+}
+/**
+ * @const
+ * @type {Object<string, function(import("../geom/Geometry.js").default): string>}
+ */
+
+
+var GeometryEncoder = {
+  'Point': encodePointGeometry,
+  'LineString': encodeLineStringGeometry,
+  'Polygon': encodePolygonGeometry,
+  'MultiPoint': encodeMultiPointGeometry,
+  'MultiLineString': encodeMultiLineStringGeometry,
+  'MultiPolygon': encodeMultiPolygonGeometry,
+  'GeometryCollection': encodeGeometryCollectionGeometry
+};
+/**
+ * Encode a geometry as WKT.
+ * @param {!import("../geom/Geometry.js").default} geom The geometry to encode.
+ * @return {string} WKT string for the geometry.
+ */
+
+function encode(geom) {
+  var type = geom.getType();
+  var geometryEncoder = GeometryEncoder[type];
+  var enc = geometryEncoder(geom);
+  type = type.toUpperCase();
+
+  if (typeof
+  /** @type {?} */
+  geom.getFlatCoordinates === 'function') {
+    var dimInfo = encodeGeometryLayout(
+    /** @type {import("../geom/SimpleGeometry.js").default} */
+    geom);
+
+    if (dimInfo.length > 0) {
+      type += ' ' + dimInfo;
+    }
+  }
+
+  if (enc.length === 0) {
+    return type + ' ' + EMPTY;
+  }
+
+  return type + '(' + enc + ')';
+}
+
+var _default = WKT;
+exports.default = _default;
+},{"../Feature.js":"../node_modules/ol/Feature.js","./Feature.js":"../node_modules/ol/format/Feature.js","./TextFeature.js":"../node_modules/ol/format/TextFeature.js","../geom/GeometryCollection.js":"../node_modules/ol/geom/GeometryCollection.js","../geom/GeometryType.js":"../node_modules/ol/geom/GeometryType.js","../geom/GeometryLayout.js":"../node_modules/ol/geom/GeometryLayout.js","../geom/LineString.js":"../node_modules/ol/geom/LineString.js","../geom/MultiLineString.js":"../node_modules/ol/geom/MultiLineString.js","../geom/MultiPoint.js":"../node_modules/ol/geom/MultiPoint.js","../geom/MultiPolygon.js":"../node_modules/ol/geom/MultiPolygon.js","../geom/Point.js":"../node_modules/ol/geom/Point.js","../geom/Polygon.js":"../node_modules/ol/geom/Polygon.js"}],"../node_modules/ol/format/WMSCapabilities.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _XLink = require("./XLink.js");
+
+var _XML = _interopRequireDefault(require("./XML.js"));
+
+var _xsd = require("./xsd.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/WMSCapabilities
+ */
+
+/**
+ * @const
+ * @type {Array<null|string>}
+ */
+var NAMESPACE_URIS = [null, 'http://www.opengis.net/wms'];
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Service': (0, _xml.makeObjectPropertySetter)(readService),
+  'Capability': (0, _xml.makeObjectPropertySetter)(readCapability)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var CAPABILITY_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Request': (0, _xml.makeObjectPropertySetter)(readRequest),
+  'Exception': (0, _xml.makeObjectPropertySetter)(readException),
+  'Layer': (0, _xml.makeObjectPropertySetter)(readCapabilityLayer)
+});
+/**
+ * @classdesc
+ * Format for reading WMS capabilities data
+ *
+ * @api
+ */
+
+var WMSCapabilities =
+/*@__PURE__*/
+function (XML) {
+  function WMSCapabilities() {
+    XML.call(this);
+    /**
+     * @type {string|undefined}
+     */
+
+    this.version = undefined;
+  }
+
+  if (XML) WMSCapabilities.__proto__ = XML;
+  WMSCapabilities.prototype = Object.create(XML && XML.prototype);
+  WMSCapabilities.prototype.constructor = WMSCapabilities;
+  /**
+   * @inheritDoc
+   */
+
+  WMSCapabilities.prototype.readFromDocument = function readFromDocument(doc) {
+    for (var n = doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        return this.readFromNode(n);
+      }
+    }
+
+    return null;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WMSCapabilities.prototype.readFromNode = function readFromNode(node) {
+    this.version = node.getAttribute('version').trim();
+    var wmsCapabilityObject = (0, _xml.pushParseAndPop)({
+      'version': this.version
+    }, PARSERS, node, []);
+    return wmsCapabilityObject ? wmsCapabilityObject : null;
+  };
+
+  return WMSCapabilities;
+}(_XML.default);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var SERVICE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Name': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Title': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Abstract': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'KeywordList': (0, _xml.makeObjectPropertySetter)(readKeywordList),
+  'OnlineResource': (0, _xml.makeObjectPropertySetter)(_XLink.readHref),
+  'ContactInformation': (0, _xml.makeObjectPropertySetter)(readContactInformation),
+  'Fees': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'AccessConstraints': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'LayerLimit': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'MaxWidth': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'MaxHeight': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var CONTACT_INFORMATION_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ContactPersonPrimary': (0, _xml.makeObjectPropertySetter)(readContactPersonPrimary),
+  'ContactPosition': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ContactAddress': (0, _xml.makeObjectPropertySetter)(readContactAddress),
+  'ContactVoiceTelephone': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ContactFacsimileTelephone': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ContactElectronicMailAddress': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var CONTACT_PERSON_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'ContactPerson': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'ContactOrganization': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var CONTACT_ADDRESS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'AddressType': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Address': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'City': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'StateOrProvince': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'PostCode': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Country': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var EXCEPTION_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Format': (0, _xml.makeArrayPusher)(_xsd.readString)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var LAYER_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Name': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Title': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Abstract': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'KeywordList': (0, _xml.makeObjectPropertySetter)(readKeywordList),
+  'CRS': (0, _xml.makeObjectPropertyPusher)(_xsd.readString),
+  'EX_GeographicBoundingBox': (0, _xml.makeObjectPropertySetter)(readEXGeographicBoundingBox),
+  'BoundingBox': (0, _xml.makeObjectPropertyPusher)(readBoundingBox),
+  'Dimension': (0, _xml.makeObjectPropertyPusher)(readDimension),
+  'Attribution': (0, _xml.makeObjectPropertySetter)(readAttribution),
+  'AuthorityURL': (0, _xml.makeObjectPropertyPusher)(readAuthorityURL),
+  'Identifier': (0, _xml.makeObjectPropertyPusher)(_xsd.readString),
+  'MetadataURL': (0, _xml.makeObjectPropertyPusher)(readMetadataURL),
+  'DataURL': (0, _xml.makeObjectPropertyPusher)(readFormatOnlineresource),
+  'FeatureListURL': (0, _xml.makeObjectPropertyPusher)(readFormatOnlineresource),
+  'Style': (0, _xml.makeObjectPropertyPusher)(readStyle),
+  'MinScaleDenominator': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'MaxScaleDenominator': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'Layer': (0, _xml.makeObjectPropertyPusher)(readLayer)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var ATTRIBUTION_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Title': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'OnlineResource': (0, _xml.makeObjectPropertySetter)(_XLink.readHref),
+  'LogoURL': (0, _xml.makeObjectPropertySetter)(readSizedFormatOnlineresource)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var EX_GEOGRAPHIC_BOUNDING_BOX_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'westBoundLongitude': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'eastBoundLongitude': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'southBoundLatitude': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'northBoundLatitude': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var REQUEST_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'GetCapabilities': (0, _xml.makeObjectPropertySetter)(readOperationType),
+  'GetMap': (0, _xml.makeObjectPropertySetter)(readOperationType),
+  'GetFeatureInfo': (0, _xml.makeObjectPropertySetter)(readOperationType)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var OPERATIONTYPE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Format': (0, _xml.makeObjectPropertyPusher)(_xsd.readString),
+  'DCPType': (0, _xml.makeObjectPropertyPusher)(readDCPType)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var DCPTYPE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'HTTP': (0, _xml.makeObjectPropertySetter)(readHTTP)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var HTTP_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Get': (0, _xml.makeObjectPropertySetter)(readFormatOnlineresource),
+  'Post': (0, _xml.makeObjectPropertySetter)(readFormatOnlineresource)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var STYLE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Name': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Title': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Abstract': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'LegendURL': (0, _xml.makeObjectPropertyPusher)(readSizedFormatOnlineresource),
+  'StyleSheetURL': (0, _xml.makeObjectPropertySetter)(readFormatOnlineresource),
+  'StyleURL': (0, _xml.makeObjectPropertySetter)(readFormatOnlineresource)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var FORMAT_ONLINERESOURCE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Format': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'OnlineResource': (0, _xml.makeObjectPropertySetter)(_XLink.readHref)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var KEYWORDLIST_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Keyword': (0, _xml.makeArrayPusher)(_xsd.readString)
+});
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Attribution object.
+ */
+
+function readAttribution(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, ATTRIBUTION_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object} Bounding box object.
+ */
+
+
+function readBoundingBox(node, objectStack) {
+  var extent = [(0, _xsd.readDecimalString)(node.getAttribute('minx')), (0, _xsd.readDecimalString)(node.getAttribute('miny')), (0, _xsd.readDecimalString)(node.getAttribute('maxx')), (0, _xsd.readDecimalString)(node.getAttribute('maxy'))];
+  var resolutions = [(0, _xsd.readDecimalString)(node.getAttribute('resx')), (0, _xsd.readDecimalString)(node.getAttribute('resy'))];
+  return {
+    'crs': node.getAttribute('CRS'),
+    'extent': extent,
+    'res': resolutions
+  };
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {import("../extent.js").Extent|undefined} Bounding box object.
+ */
+
+
+function readEXGeographicBoundingBox(node, objectStack) {
+  var geographicBoundingBox = (0, _xml.pushParseAndPop)({}, EX_GEOGRAPHIC_BOUNDING_BOX_PARSERS, node, objectStack);
+
+  if (!geographicBoundingBox) {
+    return undefined;
+  }
+
+  var westBoundLongitude =
+  /** @type {number|undefined} */
+  geographicBoundingBox['westBoundLongitude'];
+  var southBoundLatitude =
+  /** @type {number|undefined} */
+  geographicBoundingBox['southBoundLatitude'];
+  var eastBoundLongitude =
+  /** @type {number|undefined} */
+  geographicBoundingBox['eastBoundLongitude'];
+  var northBoundLatitude =
+  /** @type {number|undefined} */
+  geographicBoundingBox['northBoundLatitude'];
+
+  if (westBoundLongitude === undefined || southBoundLatitude === undefined || eastBoundLongitude === undefined || northBoundLatitude === undefined) {
+    return undefined;
+  }
+
+  return [westBoundLongitude, southBoundLatitude, eastBoundLongitude, northBoundLatitude];
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Capability object.
+ */
+
+
+function readCapability(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, CAPABILITY_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Service object.
+ */
+
+
+function readService(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, SERVICE_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Contact information object.
+ */
+
+
+function readContactInformation(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, CONTACT_INFORMATION_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Contact person object.
+ */
+
+
+function readContactPersonPrimary(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, CONTACT_PERSON_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Contact address object.
+ */
+
+
+function readContactAddress(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, CONTACT_ADDRESS_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Array<string>|undefined} Format array.
+ */
+
+
+function readException(node, objectStack) {
+  return (0, _xml.pushParseAndPop)([], EXCEPTION_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Layer object.
+ */
+
+
+function readCapabilityLayer(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, LAYER_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Layer object.
+ */
+
+
+function readLayer(node, objectStack) {
+  var parentLayerObject =
+  /**  @type {!Object<string,*>} */
+  objectStack[objectStack.length - 1];
+  var layerObject = (0, _xml.pushParseAndPop)({}, LAYER_PARSERS, node, objectStack);
+
+  if (!layerObject) {
+    return undefined;
+  }
+
+  var queryable = (0, _xsd.readBooleanString)(node.getAttribute('queryable'));
+
+  if (queryable === undefined) {
+    queryable = parentLayerObject['queryable'];
+  }
+
+  layerObject['queryable'] = queryable !== undefined ? queryable : false;
+  var cascaded = (0, _xsd.readNonNegativeIntegerString)(node.getAttribute('cascaded'));
+
+  if (cascaded === undefined) {
+    cascaded = parentLayerObject['cascaded'];
+  }
+
+  layerObject['cascaded'] = cascaded;
+  var opaque = (0, _xsd.readBooleanString)(node.getAttribute('opaque'));
+
+  if (opaque === undefined) {
+    opaque = parentLayerObject['opaque'];
+  }
+
+  layerObject['opaque'] = opaque !== undefined ? opaque : false;
+  var noSubsets = (0, _xsd.readBooleanString)(node.getAttribute('noSubsets'));
+
+  if (noSubsets === undefined) {
+    noSubsets = parentLayerObject['noSubsets'];
+  }
+
+  layerObject['noSubsets'] = noSubsets !== undefined ? noSubsets : false;
+  var fixedWidth = (0, _xsd.readDecimalString)(node.getAttribute('fixedWidth'));
+
+  if (!fixedWidth) {
+    fixedWidth = parentLayerObject['fixedWidth'];
+  }
+
+  layerObject['fixedWidth'] = fixedWidth;
+  var fixedHeight = (0, _xsd.readDecimalString)(node.getAttribute('fixedHeight'));
+
+  if (!fixedHeight) {
+    fixedHeight = parentLayerObject['fixedHeight'];
+  }
+
+  layerObject['fixedHeight'] = fixedHeight; // See 7.2.4.8
+
+  var addKeys = ['Style', 'CRS', 'AuthorityURL'];
+  addKeys.forEach(function (key) {
+    if (key in parentLayerObject) {
+      var childValue = layerObject[key] || [];
+      layerObject[key] = childValue.concat(parentLayerObject[key]);
+    }
+  });
+  var replaceKeys = ['EX_GeographicBoundingBox', 'BoundingBox', 'Dimension', 'Attribution', 'MinScaleDenominator', 'MaxScaleDenominator'];
+  replaceKeys.forEach(function (key) {
+    if (!(key in layerObject)) {
+      var parentValue = parentLayerObject[key];
+      layerObject[key] = parentValue;
+    }
+  });
+  return layerObject;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object} Dimension object.
+ */
+
+
+function readDimension(node, objectStack) {
+  var dimensionObject = {
+    'name': node.getAttribute('name'),
+    'units': node.getAttribute('units'),
+    'unitSymbol': node.getAttribute('unitSymbol'),
+    'default': node.getAttribute('default'),
+    'multipleValues': (0, _xsd.readBooleanString)(node.getAttribute('multipleValues')),
+    'nearestValue': (0, _xsd.readBooleanString)(node.getAttribute('nearestValue')),
+    'current': (0, _xsd.readBooleanString)(node.getAttribute('current')),
+    'values': (0, _xsd.readString)(node)
+  };
+  return dimensionObject;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Online resource object.
+ */
+
+
+function readFormatOnlineresource(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, FORMAT_ONLINERESOURCE_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Request object.
+ */
+
+
+function readRequest(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, REQUEST_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} DCP type object.
+ */
+
+
+function readDCPType(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, DCPTYPE_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} HTTP object.
+ */
+
+
+function readHTTP(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, HTTP_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Operation type object.
+ */
+
+
+function readOperationType(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, OPERATIONTYPE_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Online resource object.
+ */
+
+
+function readSizedFormatOnlineresource(node, objectStack) {
+  var formatOnlineresource = readFormatOnlineresource(node, objectStack);
+
+  if (formatOnlineresource) {
+    var size = [(0, _xsd.readNonNegativeIntegerString)(node.getAttribute('width')), (0, _xsd.readNonNegativeIntegerString)(node.getAttribute('height'))];
+    formatOnlineresource['size'] = size;
+    return formatOnlineresource;
+  }
+
+  return undefined;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Authority URL object.
+ */
+
+
+function readAuthorityURL(node, objectStack) {
+  var authorityObject = readFormatOnlineresource(node, objectStack);
+
+  if (authorityObject) {
+    authorityObject['name'] = node.getAttribute('name');
+    return authorityObject;
+  }
+
+  return undefined;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Metadata URL object.
+ */
+
+
+function readMetadataURL(node, objectStack) {
+  var metadataObject = readFormatOnlineresource(node, objectStack);
+
+  if (metadataObject) {
+    metadataObject['type'] = node.getAttribute('type');
+    return metadataObject;
+  }
+
+  return undefined;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Style object.
+ */
+
+
+function readStyle(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, STYLE_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Array<string>|undefined} Keyword list.
+ */
+
+
+function readKeywordList(node, objectStack) {
+  return (0, _xml.pushParseAndPop)([], KEYWORDLIST_PARSERS, node, objectStack);
+}
+
+var _default = WMSCapabilities;
+exports.default = _default;
+},{"./XLink.js":"../node_modules/ol/format/XLink.js","./XML.js":"../node_modules/ol/format/XML.js","./xsd.js":"../node_modules/ol/format/xsd.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/WMSGetFeatureInfo.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _array = require("../array.js");
+
+var _GML = _interopRequireDefault(require("./GML2.js"));
+
+var _XMLFeature = _interopRequireDefault(require("./XMLFeature.js"));
+
+var _obj = require("../obj.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/WMSGetFeatureInfo
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {Array<string>} [layers] If set, only features of the given layers will be returned by the format when read.
+ */
+
+/**
+ * @const
+ * @type {string}
+ */
+var featureIdentifier = '_feature';
+/**
+ * @const
+ * @type {string}
+ */
+
+var layerIdentifier = '_layer';
+/**
+ * @classdesc
+ * Format for reading WMSGetFeatureInfo format. It uses
+ * {@link module:ol/format/GML2~GML2} to read features.
+ *
+ * @api
+ */
+
+var WMSGetFeatureInfo =
+/*@__PURE__*/
+function (XMLFeature) {
+  function WMSGetFeatureInfo(opt_options) {
+    XMLFeature.call(this);
+    var options = opt_options ? opt_options : {};
+    /**
+     * @private
+     * @type {string}
+     */
+
+    this.featureNS_ = 'http://mapserver.gis.umn.edu/mapserver';
+    /**
+     * @private
+     * @type {GML2}
+     */
+
+    this.gmlFormat_ = new _GML.default();
+    /**
+     * @private
+     * @type {Array<string>}
+     */
+
+    this.layers_ = options.layers ? options.layers : null;
+  }
+
+  if (XMLFeature) WMSGetFeatureInfo.__proto__ = XMLFeature;
+  WMSGetFeatureInfo.prototype = Object.create(XMLFeature && XMLFeature.prototype);
+  WMSGetFeatureInfo.prototype.constructor = WMSGetFeatureInfo;
+  /**
+   * @return {Array<string>} layers
+   */
+
+  WMSGetFeatureInfo.prototype.getLayers = function getLayers() {
+    return this.layers_;
+  };
+  /**
+   * @param {Array<string>} layers Layers to parse.
+   */
+
+
+  WMSGetFeatureInfo.prototype.setLayers = function setLayers(layers) {
+    this.layers_ = layers;
+  };
+  /**
+   * @param {Element} node Node.
+   * @param {Array<*>} objectStack Object stack.
+   * @return {Array<import("../Feature.js").default>} Features.
+   * @private
+   */
+
+
+  WMSGetFeatureInfo.prototype.readFeatures_ = function readFeatures_(node, objectStack) {
+    node.setAttribute('namespaceURI', this.featureNS_);
+    var localName = node.localName;
+    /** @type {Array<import("../Feature.js").default>} */
+
+    var features = [];
+
+    if (node.childNodes.length === 0) {
+      return features;
+    }
+
+    if (localName == 'msGMLOutput') {
+      for (var i = 0, ii = node.childNodes.length; i < ii; i++) {
+        var layer = node.childNodes[i];
+
+        if (layer.nodeType !== Node.ELEMENT_NODE) {
+          continue;
+        }
+
+        var layerElement =
+        /** @type {Element} */
+        layer;
+        var context = objectStack[0];
+        var toRemove = layerIdentifier;
+        var layerName = layerElement.localName.replace(toRemove, '');
+
+        if (this.layers_ && !(0, _array.includes)(this.layers_, layerName)) {
+          continue;
+        }
+
+        var featureType = layerName + featureIdentifier;
+        context['featureType'] = featureType;
+        context['featureNS'] = this.featureNS_;
+        /** @type {Object<string, import("../xml.js").Parser>} */
+
+        var parsers = {};
+        parsers[featureType] = (0, _xml.makeArrayPusher)(this.gmlFormat_.readFeatureElement, this.gmlFormat_);
+        var parsersNS = (0, _xml.makeStructureNS)([context['featureNS'], null], parsers);
+        layerElement.setAttribute('namespaceURI', this.featureNS_);
+        var layerFeatures = (0, _xml.pushParseAndPop)([], parsersNS, layerElement, objectStack, this.gmlFormat_);
+
+        if (layerFeatures) {
+          (0, _array.extend)(features, layerFeatures);
+        }
+      }
+    }
+
+    if (localName == 'FeatureCollection') {
+      var gmlFeatures = (0, _xml.pushParseAndPop)([], this.gmlFormat_.FEATURE_COLLECTION_PARSERS, node, [{}], this.gmlFormat_);
+
+      if (gmlFeatures) {
+        features = gmlFeatures;
+      }
+    }
+
+    return features;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WMSGetFeatureInfo.prototype.readFeaturesFromNode = function readFeaturesFromNode(node, opt_options) {
+    var options = {};
+
+    if (opt_options) {
+      (0, _obj.assign)(options, this.getReadOptions(node, opt_options));
+    }
+
+    return this.readFeatures_(node, [options]);
+  };
+
+  return WMSGetFeatureInfo;
+}(_XMLFeature.default);
+
+var _default = WMSGetFeatureInfo;
+exports.default = _default;
+},{"../array.js":"../node_modules/ol/array.js","./GML2.js":"../node_modules/ol/format/GML2.js","./XMLFeature.js":"../node_modules/ol/format/XMLFeature.js","../obj.js":"../node_modules/ol/obj.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format/WMTSCapabilities.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _extent = require("../extent.js");
+
+var _OWS = _interopRequireDefault(require("./OWS.js"));
+
+var _XLink = require("./XLink.js");
+
+var _XML = _interopRequireDefault(require("./XML.js"));
+
+var _xsd = require("./xsd.js");
+
+var _xml = require("../xml.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/format/WMTSCapabilities
+ */
+
+/**
+ * @const
+ * @type {Array<null|string>}
+ */
+var NAMESPACE_URIS = [null, 'http://www.opengis.net/wmts/1.0'];
+/**
+ * @const
+ * @type {Array<null|string>}
+ */
+
+var OWS_NAMESPACE_URIS = [null, 'http://www.opengis.net/ows/1.1'];
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Contents': (0, _xml.makeObjectPropertySetter)(readContents)
+});
+/**
+ * @classdesc
+ * Format for reading WMTS capabilities data.
+ *
+ * @api
+ */
+
+var WMTSCapabilities =
+/*@__PURE__*/
+function (XML) {
+  function WMTSCapabilities() {
+    XML.call(this);
+    /**
+     * @type {OWS}
+     * @private
+     */
+
+    this.owsParser_ = new _OWS.default();
+  }
+
+  if (XML) WMTSCapabilities.__proto__ = XML;
+  WMTSCapabilities.prototype = Object.create(XML && XML.prototype);
+  WMTSCapabilities.prototype.constructor = WMTSCapabilities;
+  /**
+   * @inheritDoc
+   */
+
+  WMTSCapabilities.prototype.readFromDocument = function readFromDocument(doc) {
+    for (var n = doc.firstChild; n; n = n.nextSibling) {
+      if (n.nodeType == Node.ELEMENT_NODE) {
+        return this.readFromNode(n);
+      }
+    }
+
+    return null;
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  WMTSCapabilities.prototype.readFromNode = function readFromNode(node) {
+    var version = node.getAttribute('version').trim();
+    var WMTSCapabilityObject = this.owsParser_.readFromNode(node);
+
+    if (!WMTSCapabilityObject) {
+      return null;
+    }
+
+    WMTSCapabilityObject['version'] = version;
+    WMTSCapabilityObject = (0, _xml.pushParseAndPop)(WMTSCapabilityObject, PARSERS, node, []);
+    return WMTSCapabilityObject ? WMTSCapabilityObject : null;
+  };
+
+  return WMTSCapabilities;
+}(_XML.default);
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+
+var CONTENTS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Layer': (0, _xml.makeObjectPropertyPusher)(readLayer),
+  'TileMatrixSet': (0, _xml.makeObjectPropertyPusher)(readTileMatrixSet)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var LAYER_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Style': (0, _xml.makeObjectPropertyPusher)(readStyle),
+  'Format': (0, _xml.makeObjectPropertyPusher)(_xsd.readString),
+  'TileMatrixSetLink': (0, _xml.makeObjectPropertyPusher)(readTileMatrixSetLink),
+  'Dimension': (0, _xml.makeObjectPropertyPusher)(readDimensions),
+  'ResourceURL': (0, _xml.makeObjectPropertyPusher)(readResourceUrl)
+}, (0, _xml.makeStructureNS)(OWS_NAMESPACE_URIS, {
+  'Title': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Abstract': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'WGS84BoundingBox': (0, _xml.makeObjectPropertySetter)(readWgs84BoundingBox),
+  'Identifier': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+}));
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var STYLE_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'LegendURL': (0, _xml.makeObjectPropertyPusher)(readLegendUrl)
+}, (0, _xml.makeStructureNS)(OWS_NAMESPACE_URIS, {
+  'Title': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Identifier': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+}));
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TMS_LINKS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'TileMatrixSet': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'TileMatrixSetLimits': (0, _xml.makeObjectPropertySetter)(readTileMatrixLimitsList)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TMS_LIMITS_LIST_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'TileMatrixLimits': (0, _xml.makeArrayPusher)(readTileMatrixLimits)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TMS_LIMITS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'TileMatrix': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'MinTileRow': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'MaxTileRow': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'MinTileCol': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'MaxTileCol': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var DIMENSION_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'Default': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Value': (0, _xml.makeObjectPropertyPusher)(_xsd.readString)
+}, (0, _xml.makeStructureNS)(OWS_NAMESPACE_URIS, {
+  'Identifier': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+}));
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var WGS84_BBOX_READERS = (0, _xml.makeStructureNS)(OWS_NAMESPACE_URIS, {
+  'LowerCorner': (0, _xml.makeArrayPusher)(readCoordinates),
+  'UpperCorner': (0, _xml.makeArrayPusher)(readCoordinates)
+});
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TMS_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'WellKnownScaleSet': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'TileMatrix': (0, _xml.makeObjectPropertyPusher)(readTileMatrix)
+}, (0, _xml.makeStructureNS)(OWS_NAMESPACE_URIS, {
+  'SupportedCRS': (0, _xml.makeObjectPropertySetter)(_xsd.readString),
+  'Identifier': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+}));
+/**
+ * @const
+ * @type {Object<string, Object<string, import("../xml.js").Parser>>}
+ */
+
+var TM_PARSERS = (0, _xml.makeStructureNS)(NAMESPACE_URIS, {
+  'TopLeftCorner': (0, _xml.makeObjectPropertySetter)(readCoordinates),
+  'ScaleDenominator': (0, _xml.makeObjectPropertySetter)(_xsd.readDecimal),
+  'TileWidth': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'TileHeight': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'MatrixWidth': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger),
+  'MatrixHeight': (0, _xml.makeObjectPropertySetter)(_xsd.readNonNegativeInteger)
+}, (0, _xml.makeStructureNS)(OWS_NAMESPACE_URIS, {
+  'Identifier': (0, _xml.makeObjectPropertySetter)(_xsd.readString)
+}));
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Attribution object.
+ */
+
+function readContents(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, CONTENTS_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Layers object.
+ */
+
+
+function readLayer(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, LAYER_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Tile Matrix Set object.
+ */
+
+
+function readTileMatrixSet(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, TMS_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Style object.
+ */
+
+
+function readStyle(node, objectStack) {
+  var style = (0, _xml.pushParseAndPop)({}, STYLE_PARSERS, node, objectStack);
+
+  if (!style) {
+    return undefined;
+  }
+
+  var isDefault = node.getAttribute('isDefault') === 'true';
+  style['isDefault'] = isDefault;
+  return style;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Tile Matrix Set Link object.
+ */
+
+
+function readTileMatrixSetLink(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, TMS_LINKS_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Dimension object.
+ */
+
+
+function readDimensions(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, DIMENSION_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Resource URL object.
+ */
+
+
+function readResourceUrl(node, objectStack) {
+  var format = node.getAttribute('format');
+  var template = node.getAttribute('template');
+  var resourceType = node.getAttribute('resourceType');
+  var resource = {};
+
+  if (format) {
+    resource['format'] = format;
+  }
+
+  if (template) {
+    resource['template'] = template;
+  }
+
+  if (resourceType) {
+    resource['resourceType'] = resourceType;
+  }
+
+  return resource;
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} WGS84 BBox object.
+ */
+
+
+function readWgs84BoundingBox(node, objectStack) {
+  var coordinates = (0, _xml.pushParseAndPop)([], WGS84_BBOX_READERS, node, objectStack);
+
+  if (coordinates.length != 2) {
+    return undefined;
+  }
+
+  return (0, _extent.boundingExtent)(coordinates);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Legend object.
+ */
+
+
+function readLegendUrl(node, objectStack) {
+  var legend = {};
+  legend['format'] = node.getAttribute('format');
+  legend['href'] = (0, _XLink.readHref)(node);
+  return legend;
+}
+/**
+ * @param {Node} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} Coordinates object.
+ */
+
+
+function readCoordinates(node, objectStack) {
+  var coordinates = (0, _xsd.readString)(node).split(/\s+/);
+
+  if (!coordinates || coordinates.length != 2) {
+    return undefined;
+  }
+
+  var x = +coordinates[0];
+  var y = +coordinates[1];
+
+  if (isNaN(x) || isNaN(y)) {
+    return undefined;
+  }
+
+  return [x, y];
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} TileMatrix object.
+ */
+
+
+function readTileMatrix(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, TM_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} TileMatrixSetLimits Object.
+ */
+
+
+function readTileMatrixLimitsList(node, objectStack) {
+  return (0, _xml.pushParseAndPop)([], TMS_LIMITS_LIST_PARSERS, node, objectStack);
+}
+/**
+ * @param {Element} node Node.
+ * @param {Array<*>} objectStack Object stack.
+ * @return {Object|undefined} TileMatrixLimits Array.
+ */
+
+
+function readTileMatrixLimits(node, objectStack) {
+  return (0, _xml.pushParseAndPop)({}, TMS_LIMITS_PARSERS, node, objectStack);
+}
+
+var _default = WMTSCapabilities;
+exports.default = _default;
+},{"../extent.js":"../node_modules/ol/extent.js","./OWS.js":"../node_modules/ol/format/OWS.js","./XLink.js":"../node_modules/ol/format/XLink.js","./XML.js":"../node_modules/ol/format/XML.js","./xsd.js":"../node_modules/ol/format/xsd.js","../xml.js":"../node_modules/ol/xml.js"}],"../node_modules/ol/format.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "EsriJSON", {
+  enumerable: true,
+  get: function () {
+    return _EsriJSON.default;
+  }
+});
+Object.defineProperty(exports, "GeoJSON", {
+  enumerable: true,
+  get: function () {
+    return _GeoJSON.default;
+  }
+});
+Object.defineProperty(exports, "GML", {
+  enumerable: true,
+  get: function () {
+    return _GML.default;
+  }
+});
+Object.defineProperty(exports, "GPX", {
+  enumerable: true,
+  get: function () {
+    return _GPX.default;
+  }
+});
+Object.defineProperty(exports, "IGC", {
+  enumerable: true,
+  get: function () {
+    return _IGC.default;
+  }
+});
+Object.defineProperty(exports, "KML", {
+  enumerable: true,
+  get: function () {
+    return _KML.default;
+  }
+});
+Object.defineProperty(exports, "MVT", {
+  enumerable: true,
+  get: function () {
+    return _MVT.default;
+  }
+});
+Object.defineProperty(exports, "OWS", {
+  enumerable: true,
+  get: function () {
+    return _OWS.default;
+  }
+});
+Object.defineProperty(exports, "Polyline", {
+  enumerable: true,
+  get: function () {
+    return _Polyline.default;
+  }
+});
+Object.defineProperty(exports, "TopoJSON", {
+  enumerable: true,
+  get: function () {
+    return _TopoJSON.default;
+  }
+});
+Object.defineProperty(exports, "WFS", {
+  enumerable: true,
+  get: function () {
+    return _WFS.default;
+  }
+});
+Object.defineProperty(exports, "WKT", {
+  enumerable: true,
+  get: function () {
+    return _WKT.default;
+  }
+});
+Object.defineProperty(exports, "WMSCapabilities", {
+  enumerable: true,
+  get: function () {
+    return _WMSCapabilities.default;
+  }
+});
+Object.defineProperty(exports, "WMSGetFeatureInfo", {
+  enumerable: true,
+  get: function () {
+    return _WMSGetFeatureInfo.default;
+  }
+});
+Object.defineProperty(exports, "WMTSCapabilities", {
+  enumerable: true,
+  get: function () {
+    return _WMTSCapabilities.default;
+  }
+});
+
+var _EsriJSON = _interopRequireDefault(require("./format/EsriJSON.js"));
+
+var _GeoJSON = _interopRequireDefault(require("./format/GeoJSON.js"));
+
+var _GML = _interopRequireDefault(require("./format/GML.js"));
+
+var _GPX = _interopRequireDefault(require("./format/GPX.js"));
+
+var _IGC = _interopRequireDefault(require("./format/IGC.js"));
+
+var _KML = _interopRequireDefault(require("./format/KML.js"));
+
+var _MVT = _interopRequireDefault(require("./format/MVT.js"));
+
+var _OWS = _interopRequireDefault(require("./format/OWS.js"));
+
+var _Polyline = _interopRequireDefault(require("./format/Polyline.js"));
+
+var _TopoJSON = _interopRequireDefault(require("./format/TopoJSON.js"));
+
+var _WFS = _interopRequireDefault(require("./format/WFS.js"));
+
+var _WKT = _interopRequireDefault(require("./format/WKT.js"));
+
+var _WMSCapabilities = _interopRequireDefault(require("./format/WMSCapabilities.js"));
+
+var _WMSGetFeatureInfo = _interopRequireDefault(require("./format/WMSGetFeatureInfo.js"));
+
+var _WMTSCapabilities = _interopRequireDefault(require("./format/WMTSCapabilities.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+},{"./format/EsriJSON.js":"../node_modules/ol/format/EsriJSON.js","./format/GeoJSON.js":"../node_modules/ol/format/GeoJSON.js","./format/GML.js":"../node_modules/ol/format/GML.js","./format/GPX.js":"../node_modules/ol/format/GPX.js","./format/IGC.js":"../node_modules/ol/format/IGC.js","./format/KML.js":"../node_modules/ol/format/KML.js","./format/MVT.js":"../node_modules/ol/format/MVT.js","./format/OWS.js":"../node_modules/ol/format/OWS.js","./format/Polyline.js":"../node_modules/ol/format/Polyline.js","./format/TopoJSON.js":"../node_modules/ol/format/TopoJSON.js","./format/WFS.js":"../node_modules/ol/format/WFS.js","./format/WKT.js":"../node_modules/ol/format/WKT.js","./format/WMSCapabilities.js":"../node_modules/ol/format/WMSCapabilities.js","./format/WMSGetFeatureInfo.js":"../node_modules/ol/format/WMSGetFeatureInfo.js","./format/WMTSCapabilities.js":"../node_modules/ol/format/WMTSCapabilities.js"}],"../node_modules/ol/layer/Heatmap.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _events = require("../events.js");
+
+var _Object = require("../Object.js");
+
+var _dom = require("../dom.js");
+
+var _Vector = _interopRequireDefault(require("./Vector.js"));
+
+var _math = require("../math.js");
+
+var _obj = require("../obj.js");
+
+var _EventType = _interopRequireDefault(require("../render/EventType.js"));
+
+var _Icon = _interopRequireDefault(require("../style/Icon.js"));
+
+var _Style = _interopRequireDefault(require("../style/Style.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/layer/Heatmap
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {number} [opacity=1] Opacity (0, 1).
+ * @property {boolean} [visible=true] Visibility.
+ * @property {import("../extent.js").Extent} [extent] The bounding extent for layer rendering.  The layer will not be
+ * rendered outside of this extent.
+ * @property {number} [zIndex] The z-index for layer rendering.  At rendering time, the layers
+ * will be ordered, first by Z-index and then by position. When `undefined`, a `zIndex` of 0 is assumed
+ * for layers that are added to the map's `layers` collection, or `Infinity` when the layer's `setMap()`
+ * method was used.
+ * @property {number} [minResolution] The minimum resolution (inclusive) at which this layer will be
+ * visible.
+ * @property {number} [maxResolution] The maximum resolution (exclusive) below which this layer will
+ * be visible.
+ * @property {Array<string>} [gradient=['#00f', '#0ff', '#0f0', '#ff0', '#f00']] The color gradient
+ * of the heatmap, specified as an array of CSS color strings.
+ * @property {number} [radius=8] Radius size in pixels.
+ * @property {number} [blur=15] Blur size in pixels.
+ * @property {number} [shadow=250] Shadow size in pixels.
+ * @property {string|function(import("../Feature.js").default):number} [weight='weight'] The feature
+ * attribute to use for the weight or a function that returns a weight from a feature. Weight values
+ * should range from 0 to 1 (and values outside will be clamped to that range).
+ * @property {import("./VectorRenderType.js").default|string} [renderMode='vector'] Render mode for vector layers:
+ *  * `'image'`: Vector layers are rendered as images. Great performance, but point symbols and
+ *    texts are always rotated with the view and pixels are scaled during zoom animations.
+ *  * `'vector'`: Vector layers are rendered as vectors. Most accurate rendering even during
+ *    animations, but slower performance.
+ * @property {import("../source/Vector.js").default} [source] Source.
+ */
+
+/**
+ * @enum {string}
+ * @private
+ */
+var Property = {
+  BLUR: 'blur',
+  GRADIENT: 'gradient',
+  RADIUS: 'radius'
+};
+/**
+ * @const
+ * @type {Array<string>}
+ */
+
+var DEFAULT_GRADIENT = ['#00f', '#0ff', '#0f0', '#ff0', '#f00'];
+/**
+ * @classdesc
+ * Layer for rendering vector data as a heatmap.
+ * Note that any property set in the options is set as a {@link module:ol/Object~BaseObject}
+ * property on the layer object; for example, setting `title: 'My Title'` in the
+ * options means that `title` is observable, and has get/set accessors.
+ *
+ * @fires import("../render/Event.js").RenderEvent
+ * @api
+ */
+
+var Heatmap =
+/*@__PURE__*/
+function (VectorLayer) {
+  function Heatmap(opt_options) {
+    var options = opt_options ? opt_options : {};
+    var baseOptions = (0, _obj.assign)({}, options);
+    delete baseOptions.gradient;
+    delete baseOptions.radius;
+    delete baseOptions.blur;
+    delete baseOptions.shadow;
+    delete baseOptions.weight;
+    VectorLayer.call(this, baseOptions);
+    /**
+     * @private
+     * @type {Uint8ClampedArray}
+     */
+
+    this.gradient_ = null;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    this.shadow_ = options.shadow !== undefined ? options.shadow : 250;
+    /**
+     * @private
+     * @type {string|undefined}
+     */
+
+    this.circleImage_ = undefined;
+    /**
+     * @private
+     * @type {Array<Array<import("../style/Style.js").default>>}
+     */
+
+    this.styleCache_ = null;
+    (0, _events.listen)(this, (0, _Object.getChangeEventType)(Property.GRADIENT), this.handleGradientChanged_, this);
+    this.setGradient(options.gradient ? options.gradient : DEFAULT_GRADIENT);
+    this.setBlur(options.blur !== undefined ? options.blur : 15);
+    this.setRadius(options.radius !== undefined ? options.radius : 8);
+    (0, _events.listen)(this, (0, _Object.getChangeEventType)(Property.BLUR), this.handleStyleChanged_, this);
+    (0, _events.listen)(this, (0, _Object.getChangeEventType)(Property.RADIUS), this.handleStyleChanged_, this);
+    this.handleStyleChanged_();
+    var weight = options.weight ? options.weight : 'weight';
+    var weightFunction;
+
+    if (typeof weight === 'string') {
+      weightFunction = function (feature) {
+        return feature.get(weight);
+      };
+    } else {
+      weightFunction = weight;
+    }
+
+    this.setStyle(function (feature, resolution) {
+      var weight = weightFunction(feature);
+      var opacity = weight !== undefined ? (0, _math.clamp)(weight, 0, 1) : 1; // cast to 8 bits
+
+      var index = 255 * opacity | 0;
+      var style = this.styleCache_[index];
+
+      if (!style) {
+        style = [new _Style.default({
+          image: new _Icon.default({
+            opacity: opacity,
+            src: this.circleImage_
+          })
+        })];
+        this.styleCache_[index] = style;
+      }
+
+      return style;
+    }.bind(this)); // For performance reasons, don't sort the features before rendering.
+    // The render order is not relevant for a heatmap representation.
+
+    this.setRenderOrder(null);
+    (0, _events.listen)(this, _EventType.default.RENDER, this.handleRender_, this);
+  }
+
+  if (VectorLayer) Heatmap.__proto__ = VectorLayer;
+  Heatmap.prototype = Object.create(VectorLayer && VectorLayer.prototype);
+  Heatmap.prototype.constructor = Heatmap;
+  /**
+   * @return {string} Data URL for a circle.
+   * @private
+   */
+
+  Heatmap.prototype.createCircle_ = function createCircle_() {
+    var radius = this.getRadius();
+    var blur = this.getBlur();
+    var halfSize = radius + blur + 1;
+    var size = 2 * halfSize;
+    var context = (0, _dom.createCanvasContext2D)(size, size);
+    context.shadowOffsetX = context.shadowOffsetY = this.shadow_;
+    context.shadowBlur = blur;
+    context.shadowColor = '#000';
+    context.beginPath();
+    var center = halfSize - this.shadow_;
+    context.arc(center, center, radius, 0, Math.PI * 2, true);
+    context.fill();
+    return context.canvas.toDataURL();
+  };
+  /**
+   * Return the blur size in pixels.
+   * @return {number} Blur size in pixels.
+   * @api
+   * @observable
+   */
+
+
+  Heatmap.prototype.getBlur = function getBlur() {
+    return (
+      /** @type {number} */
+      this.get(Property.BLUR)
+    );
+  };
+  /**
+   * Return the gradient colors as array of strings.
+   * @return {Array<string>} Colors.
+   * @api
+   * @observable
+   */
+
+
+  Heatmap.prototype.getGradient = function getGradient() {
+    return (
+      /** @type {Array<string>} */
+      this.get(Property.GRADIENT)
+    );
+  };
+  /**
+   * Return the size of the radius in pixels.
+   * @return {number} Radius size in pixel.
+   * @api
+   * @observable
+   */
+
+
+  Heatmap.prototype.getRadius = function getRadius() {
+    return (
+      /** @type {number} */
+      this.get(Property.RADIUS)
+    );
+  };
+  /**
+   * @private
+   */
+
+
+  Heatmap.prototype.handleGradientChanged_ = function handleGradientChanged_() {
+    this.gradient_ = createGradient(this.getGradient());
+  };
+  /**
+   * @private
+   */
+
+
+  Heatmap.prototype.handleStyleChanged_ = function handleStyleChanged_() {
+    this.circleImage_ = this.createCircle_();
+    this.styleCache_ = new Array(256);
+    this.changed();
+  };
+  /**
+   * @param {import("../render/Event.js").default} event Post compose event
+   * @private
+   */
+
+
+  Heatmap.prototype.handleRender_ = function handleRender_(event) {
+    var context = event.context;
+    var canvas = context.canvas;
+    var image = context.getImageData(0, 0, canvas.width, canvas.height);
+    var view8 = image.data;
+
+    for (var i = 0, ii = view8.length; i < ii; i += 4) {
+      var alpha = view8[i + 3] * 4;
+
+      if (alpha) {
+        view8[i] = this.gradient_[alpha];
+        view8[i + 1] = this.gradient_[alpha + 1];
+        view8[i + 2] = this.gradient_[alpha + 2];
+      }
+    }
+
+    context.putImageData(image, 0, 0);
+  };
+  /**
+   * Set the blur size in pixels.
+   * @param {number} blur Blur size in pixels.
+   * @api
+   * @observable
+   */
+
+
+  Heatmap.prototype.setBlur = function setBlur(blur) {
+    this.set(Property.BLUR, blur);
+  };
+  /**
+   * Set the gradient colors as array of strings.
+   * @param {Array<string>} colors Gradient.
+   * @api
+   * @observable
+   */
+
+
+  Heatmap.prototype.setGradient = function setGradient(colors) {
+    this.set(Property.GRADIENT, colors);
+  };
+  /**
+   * Set the size of the radius in pixels.
+   * @param {number} radius Radius size in pixel.
+   * @api
+   * @observable
+   */
+
+
+  Heatmap.prototype.setRadius = function setRadius(radius) {
+    this.set(Property.RADIUS, radius);
+  };
+
+  return Heatmap;
+}(_Vector.default);
+/**
+ * @param {Array<string>} colors A list of colored.
+ * @return {Uint8ClampedArray} An array.
+ */
+
+
+function createGradient(colors) {
+  var width = 1;
+  var height = 256;
+  var context = (0, _dom.createCanvasContext2D)(width, height);
+  var gradient = context.createLinearGradient(0, 0, width, height);
+  var step = 1 / (colors.length - 1);
+
+  for (var i = 0, ii = colors.length; i < ii; ++i) {
+    gradient.addColorStop(i * step, colors[i]);
+  }
+
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, width, height);
+  return context.getImageData(0, 0, width, height).data;
+}
+
+var _default = Heatmap;
+exports.default = _default;
+},{"../events.js":"../node_modules/ol/events.js","../Object.js":"../node_modules/ol/Object.js","../dom.js":"../node_modules/ol/dom.js","./Vector.js":"../node_modules/ol/layer/Vector.js","../math.js":"../node_modules/ol/math.js","../obj.js":"../node_modules/ol/obj.js","../render/EventType.js":"../node_modules/ol/render/EventType.js","../style/Icon.js":"../node_modules/ol/style/Icon.js","../style/Style.js":"../node_modules/ol/style/Style.js"}],"../node_modules/ol/layer/VectorTile.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _LayerType = _interopRequireDefault(require("../LayerType.js"));
+
+var _asserts = require("../asserts.js");
+
+var _TileProperty = _interopRequireDefault(require("./TileProperty.js"));
+
+var _Vector = _interopRequireDefault(require("./Vector.js"));
+
+var _VectorTileRenderType = _interopRequireDefault(require("./VectorTileRenderType.js"));
+
+var _obj = require("../obj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/layer/VectorTile
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {number} [opacity=1] Opacity (0, 1).
+ * @property {boolean} [visible=true] Visibility.
+ * @property {import("../extent.js").Extent} [extent] The bounding extent for layer rendering.  The layer will not be
+ * rendered outside of this extent.
+ * @property {number} [zIndex] The z-index for layer rendering.  At rendering time, the layers
+ * will be ordered, first by Z-index and then by position. When `undefined`, a `zIndex` of 0 is assumed
+ * for layers that are added to the map's `layers` collection, or `Infinity` when the layer's `setMap()`
+ * method was used.
+ * @property {number} [minResolution] The minimum resolution (inclusive) at which this layer will be
+ * visible.
+ * @property {number} [maxResolution] The maximum resolution (exclusive) below which this layer will
+ * be visible.
+ * @property {import("../render.js").OrderFunction} [renderOrder] Render order. Function to be used when sorting
+ * features before rendering. By default features are drawn in the order that they are created. Use
+ * `null` to avoid the sort, but get an undefined draw order.
+ * @property {number} [renderBuffer=100] The buffer in pixels around the tile extent used by the
+ * renderer when getting features from the vector tile for the rendering or hit-detection.
+ * Recommended value: Vector tiles are usually generated with a buffer, so this value should match
+ * the largest possible buffer of the used tiles. It should be at least the size of the largest
+ * point symbol or line width.
+ * @property {import("./VectorTileRenderType.js").default|string} [renderMode='hybrid'] Render mode for vector tiles:
+ *  * `'image'`: Vector tiles are rendered as images. Great performance, but point symbols and texts
+ *    are always rotated with the view and pixels are scaled during zoom animations.
+ *  * `'hybrid'`: Polygon and line elements are rendered as images, so pixels are scaled during zoom
+ *    animations. Point symbols and texts are accurately rendered as vectors and can stay upright on
+ *    rotated views.
+ *  * `'vector'`: Vector tiles are rendered as vectors. Most accurate rendering even during
+ *    animations, but slower performance than the other options.
+ *
+ * When `declutter` is set to `true`, `'hybrid'` will be used instead of `'image'`.
+ * @property {import("../source/VectorTile.js").default} [source] Source.
+ * @property {import("../PluggableMap.js").default} [map] Sets the layer as overlay on a map. The map will not manage
+ * this layer in its layers collection, and the layer will be rendered on top. This is useful for
+ * temporary layers. The standard way to add a layer to a map and have it managed by the map is to
+ * use {@link module:ol/Map#addLayer}.
+ * @property {boolean} [declutter=false] Declutter images and text. Decluttering is applied to all
+ * image and text styles, and the priority is defined by the z-index of the style. Lower z-index
+ * means higher priority. When set to `true`, a `renderMode` of `'image'` will be overridden with
+ * `'hybrid'`.
+ * @property {import("../style/Style.js").StyleLike} [style] Layer style. See
+ * {@link module:ol/style} for default style which will be used if this is not defined.
+ * @property {boolean} [updateWhileAnimating=false] When set to `true`, feature batches will be
+ * recreated during animations. This means that no vectors will be shown clipped, but the setting
+ * will have a performance impact for large amounts of vector data. When set to `false`, batches
+ * will be recreated when no animation is active.
+ * @property {boolean} [updateWhileInteracting=false] When set to `true`, feature batches will be
+ * recreated during interactions. See also `updateWhileAnimating`.
+ * @property {number} [preload=0] Preload. Load low-resolution tiles up to `preload` levels. `0`
+ * means no preloading.
+ * @property {import("../render.js").OrderFunction} [renderOrder] Render order. Function to be used when sorting
+ * features before rendering. By default features are drawn in the order that they are created.
+ * @property {import("../style/Style.js").StyleLike} [style] Layer style. See
+ * {@link module:ol/style} for default style which will be used if this is not defined.
+ * @property {boolean} [useInterimTilesOnError=true] Use interim tiles on error.
+ */
+
+/**
+ * @classdesc
+ * Layer for vector tile data that is rendered client-side.
+ * Note that any property set in the options is set as a {@link module:ol/Object~BaseObject}
+ * property on the layer object; for example, setting `title: 'My Title'` in the
+ * options means that `title` is observable, and has get/set accessors.
+ *
+ * @param {Options=} opt_options Options.
+ * @api
+ */
+var VectorTileLayer =
+/*@__PURE__*/
+function (VectorLayer) {
+  function VectorTileLayer(opt_options) {
+    var options = opt_options ? opt_options : {};
+    var renderMode = options.renderMode || _VectorTileRenderType.default.HYBRID;
+    (0, _asserts.assert)(renderMode == undefined || renderMode == _VectorTileRenderType.default.IMAGE || renderMode == _VectorTileRenderType.default.HYBRID || renderMode == _VectorTileRenderType.default.VECTOR, 28); // `renderMode` must be `'image'`, `'hybrid'` or `'vector'`
+
+    if (options.declutter && renderMode == _VectorTileRenderType.default.IMAGE) {
+      renderMode = _VectorTileRenderType.default.HYBRID;
+    }
+
+    options.renderMode = renderMode;
+    var baseOptions =
+    /** @type {Object} */
+    (0, _obj.assign)({}, options);
+    delete baseOptions.preload;
+    delete baseOptions.useInterimTilesOnError;
+    VectorLayer.call(
+    /** @type {import("./Vector.js").Options} */
+    this, baseOptions);
+    this.setPreload(options.preload ? options.preload : 0);
+    this.setUseInterimTilesOnError(options.useInterimTilesOnError !== undefined ? options.useInterimTilesOnError : true);
+    /**
+    * The layer type.
+    * @protected
+    * @type {import("../LayerType.js").default}
+    */
+
+    this.type = _LayerType.default.VECTOR_TILE;
+  }
+
+  if (VectorLayer) VectorTileLayer.__proto__ = VectorLayer;
+  VectorTileLayer.prototype = Object.create(VectorLayer && VectorLayer.prototype);
+  VectorTileLayer.prototype.constructor = VectorTileLayer;
+  /**
+  * Return the level as number to which we will preload tiles up to.
+  * @return {number} The level to preload tiles up to.
+  * @observable
+  * @api
+  */
+
+  VectorTileLayer.prototype.getPreload = function getPreload() {
+    return (
+      /** @type {number} */
+      this.get(_TileProperty.default.PRELOAD)
+    );
+  };
+  /**
+  * Whether we use interim tiles on error.
+  * @return {boolean} Use interim tiles on error.
+  * @observable
+  * @api
+  */
+
+
+  VectorTileLayer.prototype.getUseInterimTilesOnError = function getUseInterimTilesOnError() {
+    return (
+      /** @type {boolean} */
+      this.get(_TileProperty.default.USE_INTERIM_TILES_ON_ERROR)
+    );
+  };
+  /**
+  * Set the level as number to which we will preload tiles up to.
+  * @param {number} preload The level to preload tiles up to.
+  * @observable
+  * @api
+  */
+
+
+  VectorTileLayer.prototype.setPreload = function setPreload(preload) {
+    this.set(_TileProperty.default.PRELOAD, preload);
+  };
+  /**
+  * Set whether we use interim tiles on error.
+  * @param {boolean} useInterimTilesOnError Use interim tiles on error.
+  * @observable
+  * @api
+  */
+
+
+  VectorTileLayer.prototype.setUseInterimTilesOnError = function setUseInterimTilesOnError(useInterimTilesOnError) {
+    this.set(_TileProperty.default.USE_INTERIM_TILES_ON_ERROR, useInterimTilesOnError);
+  };
+
+  return VectorTileLayer;
+}(_Vector.default);
+/**
+ * Return the associated {@link module:ol/source/VectorTile vectortilesource} of the layer.
+ * @function
+ * @return {import("../source/VectorTile.js").default} Source.
+ * @api
+ */
+
+
+VectorTileLayer.prototype.getSource;
+var _default = VectorTileLayer;
+exports.default = _default;
+},{"../LayerType.js":"../node_modules/ol/LayerType.js","../asserts.js":"../node_modules/ol/asserts.js","./TileProperty.js":"../node_modules/ol/layer/TileProperty.js","./Vector.js":"../node_modules/ol/layer/Vector.js","./VectorTileRenderType.js":"../node_modules/ol/layer/VectorTileRenderType.js","../obj.js":"../node_modules/ol/obj.js"}],"../node_modules/ol/layer.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "Group", {
+  enumerable: true,
+  get: function () {
+    return _Group.default;
+  }
+});
+Object.defineProperty(exports, "Heatmap", {
+  enumerable: true,
+  get: function () {
+    return _Heatmap.default;
+  }
+});
+Object.defineProperty(exports, "Image", {
+  enumerable: true,
+  get: function () {
+    return _Image.default;
+  }
+});
+Object.defineProperty(exports, "Layer", {
+  enumerable: true,
+  get: function () {
+    return _Layer.default;
+  }
+});
+Object.defineProperty(exports, "Tile", {
+  enumerable: true,
+  get: function () {
+    return _Tile.default;
+  }
+});
+Object.defineProperty(exports, "Vector", {
+  enumerable: true,
+  get: function () {
+    return _Vector.default;
+  }
+});
+Object.defineProperty(exports, "VectorTile", {
+  enumerable: true,
+  get: function () {
+    return _VectorTile.default;
+  }
+});
+
+var _Group = _interopRequireDefault(require("./layer/Group.js"));
+
+var _Heatmap = _interopRequireDefault(require("./layer/Heatmap.js"));
+
+var _Image = _interopRequireDefault(require("./layer/Image.js"));
+
+var _Layer = _interopRequireDefault(require("./layer/Layer.js"));
+
+var _Tile = _interopRequireDefault(require("./layer/Tile.js"));
+
+var _Vector = _interopRequireDefault(require("./layer/Vector.js"));
+
+var _VectorTile = _interopRequireDefault(require("./layer/VectorTile.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+},{"./layer/Group.js":"../node_modules/ol/layer/Group.js","./layer/Heatmap.js":"../node_modules/ol/layer/Heatmap.js","./layer/Image.js":"../node_modules/ol/layer/Image.js","./layer/Layer.js":"../node_modules/ol/layer/Layer.js","./layer/Tile.js":"../node_modules/ol/layer/Tile.js","./layer/Vector.js":"../node_modules/ol/layer/Vector.js","./layer/VectorTile.js":"../node_modules/ol/layer/VectorTile.js"}],"../node_modules/process/browser.js":[function(require,module,exports) {
 
 // shim for using process in browser
 var process = module.exports = {}; // cached from whatever global is present so that test runners that stub it
@@ -59799,13 +79379,17 @@ var _Tile = _interopRequireDefault(require("ol/layer/Tile.js"));
 
 var _OSM = _interopRequireDefault(require("ol/source/OSM.js"));
 
-var _TileWMS = _interopRequireDefault(require("ol/source/TileWMS.js"));
-
 var _Overlay = _interopRequireDefault(require("ol/Overlay.js"));
 
 var _Image = _interopRequireDefault(require("ol/layer/Image.js"));
 
 var _ImageWMS = _interopRequireDefault(require("ol/source/ImageWMS.js"));
+
+var _format = _interopRequireDefault(require("ol/format.js"));
+
+var _layer = require("ol/layer.js");
+
+var _Vector = _interopRequireDefault(require("ol/source/Vector.js"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -59856,6 +79440,32 @@ var wmsSource = new _ImageWMS.default({
 var wmsLayer = new _Image.default({
   source: wmsSource
 });
+/**
+ * geoserver WFS服务
+ * */
+
+var vectorSource = new _Vector.default();
+var vector = new _layer.Vector({
+  source: vectorSource // style: new Style({
+  //     stroke: new Stroke({
+  //         color: 'rgba(0, 0, 255, 1.0)',
+  //         width: 2
+  //     })
+  // })
+
+}); //http请求数据
+
+fetch('http://192.168.50.254:12222/geoserver/postgis/wfs?' + 'service=wfs&' + 'version=2.0.0&' + 'request=GetFeature&' + 'typeNames=postgis:环翠区海洋牧场位置 （测绘院）&' + 'outputFormat=application/json', {
+  method: 'GET'
+}).then(function (response) {
+  console.log(response);
+  return response.json();
+}).then(function (json) {
+  console.log(json);
+  var features = new _format.default().readFeatures(json);
+  vectorSource.addFeatures(features);
+  map.getView().fit(vectorSource.getExtent());
+});
 var map = new _Map.default({
   layers: [new _Tile.default({
     source: new _OSM.default()
@@ -59868,7 +79478,7 @@ var map = new _Map.default({
   //         }
   //     })
   // }),
-  wmsLayer],
+  wmsLayer, vector],
   overlays: [overlay],
   target: 'map',
   view: new _View.default({
@@ -59910,7 +79520,7 @@ map.on('singleclick', function (evt) {
     }
   });
 });
-},{"ol/Map.js":"../node_modules/ol/Map.js","ol/View.js":"../node_modules/ol/View.js","ol/layer/Tile.js":"../node_modules/ol/layer/Tile.js","ol/source/OSM.js":"../node_modules/ol/source/OSM.js","ol/source/TileWMS.js":"../node_modules/ol/source/TileWMS.js","ol/Overlay.js":"../node_modules/ol/Overlay.js","ol/layer/Image.js":"../node_modules/ol/layer/Image.js","ol/source/ImageWMS.js":"../node_modules/ol/source/ImageWMS.js","jquery":"node_modules/jquery/dist/jquery.js"}],"node_modules/_parcel-bundler@1.11.0@parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{"ol/Map.js":"../node_modules/ol/Map.js","ol/View.js":"../node_modules/ol/View.js","ol/layer/Tile.js":"../node_modules/ol/layer/Tile.js","ol/source/OSM.js":"../node_modules/ol/source/OSM.js","ol/Overlay.js":"../node_modules/ol/Overlay.js","ol/layer/Image.js":"../node_modules/ol/layer/Image.js","ol/source/ImageWMS.js":"../node_modules/ol/source/ImageWMS.js","ol/format.js":"../node_modules/ol/format.js","ol/layer.js":"../node_modules/ol/layer.js","ol/source/Vector.js":"../node_modules/ol/source/Vector.js","jquery":"node_modules/jquery/dist/jquery.js"}],"node_modules/_parcel-bundler@1.11.0@parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -59937,7 +79547,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "8231" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "7080" + '/');
 
   ws.onmessage = function (event) {
     var data = JSON.parse(event.data);
