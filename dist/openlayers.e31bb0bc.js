@@ -79385,7 +79385,7 @@ var _Image = _interopRequireDefault(require("ol/layer/Image.js"));
 
 var _ImageWMS = _interopRequireDefault(require("ol/source/ImageWMS.js"));
 
-var _format = _interopRequireDefault(require("ol/format.js"));
+var _format = require("ol/format.js");
 
 var _layer = require("ol/layer.js");
 
@@ -79462,7 +79462,7 @@ fetch('http://192.168.50.254:12222/geoserver/postgis/wfs?' + 'service=wfs&' + 'v
   return response.json();
 }).then(function (json) {
   console.log(json);
-  var features = new _format.default().readFeatures(json);
+  var features = new _format.GeoJSON().readFeatures(json);
   vectorSource.addFeatures(features);
   map.getView().fit(vectorSource.getExtent());
 });
@@ -79482,8 +79482,8 @@ var map = new _Map.default({
   overlays: [overlay],
   target: 'map',
   view: new _View.default({
-    center: [122.20985412597656, 37.45410919189454],
-    zoom: 11,
+    // center: [122.20985412597656,37.45410919189454],
+    // zoom: 11,
     projection: 'EPSG:4326'
   })
 });
@@ -79547,7 +79547,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "7080" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "13046" + '/');
 
   ws.onmessage = function (event) {
     var data = JSON.parse(event.data);

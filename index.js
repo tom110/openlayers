@@ -6,7 +6,7 @@ import Overlay from 'ol/Overlay.js';
 import ImageLayer from 'ol/layer/Image.js';
 import ImageWMS from 'ol/source/ImageWMS.js';
 
-import GeoJSON from 'ol/format.js';
+import {WFS, GeoJSON} from 'ol/format.js';
 import {Vector as VectorLayer} from 'ol/layer.js';
 import VectorSource from 'ol/source/Vector.js';
 
@@ -91,6 +91,7 @@ fetch('http://192.168.50.254:12222/geoserver/postgis/wfs?' +
 
 
 
+
 var map = new Map({
     layers: [
         new TileLayer({
@@ -111,8 +112,8 @@ var map = new Map({
     overlays: [overlay],
     target: 'map',
     view: new View({
-        center: [122.20985412597656,37.45410919189454],
-        zoom: 11,
+        // center: [122.20985412597656,37.45410919189454],
+        // zoom: 11,
         projection: 'EPSG:4326'
     })
 });
