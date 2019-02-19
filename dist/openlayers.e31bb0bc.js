@@ -68789,7 +68789,2124 @@ var _Vector = _interopRequireDefault(require("./layer/Vector.js"));
 var _VectorTile = _interopRequireDefault(require("./layer/VectorTile.js"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
-},{"./layer/Group.js":"../node_modules/ol/layer/Group.js","./layer/Heatmap.js":"../node_modules/ol/layer/Heatmap.js","./layer/Image.js":"../node_modules/ol/layer/Image.js","./layer/Layer.js":"../node_modules/ol/layer/Layer.js","./layer/Tile.js":"../node_modules/ol/layer/Tile.js","./layer/Vector.js":"../node_modules/ol/layer/Vector.js","./layer/VectorTile.js":"../node_modules/ol/layer/VectorTile.js"}],"../node_modules/process/browser.js":[function(require,module,exports) {
+},{"./layer/Group.js":"../node_modules/ol/layer/Group.js","./layer/Heatmap.js":"../node_modules/ol/layer/Heatmap.js","./layer/Image.js":"../node_modules/ol/layer/Image.js","./layer/Layer.js":"../node_modules/ol/layer/Layer.js","./layer/Tile.js":"../node_modules/ol/layer/Tile.js","./layer/Vector.js":"../node_modules/ol/layer/Vector.js","./layer/VectorTile.js":"../node_modules/ol/layer/VectorTile.js"}],"../node_modules/ol/control/FullScreen.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _Control = _interopRequireDefault(require("./Control.js"));
+
+var _css = require("../css.js");
+
+var _dom = require("../dom.js");
+
+var _events = require("../events.js");
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/control/FullScreen
+ */
+
+/**
+ * @return {string} Change type.
+ */
+var getChangeType = function () {
+  var changeType;
+  return function () {
+    if (!changeType) {
+      var body = document.body;
+
+      if (body.webkitRequestFullscreen) {
+        changeType = 'webkitfullscreenchange';
+      } else if (body.mozRequestFullScreen) {
+        changeType = 'mozfullscreenchange';
+      } else if (body.msRequestFullscreen) {
+        changeType = 'MSFullscreenChange';
+      } else if (body.requestFullscreen) {
+        changeType = 'fullscreenchange';
+      }
+    }
+
+    return changeType;
+  };
+}();
+/**
+ * @typedef {Object} Options
+ * @property {string} [className='ol-full-screen'] CSS class name.
+ * @property {string|Text} [label='\u2922'] Text label to use for the button.
+ * Instead of text, also an element (e.g. a `span` element) can be used.
+ * @property {string|Text} [labelActive='\u00d7'] Text label to use for the
+ * button when full-screen is active.
+ * Instead of text, also an element (e.g. a `span` element) can be used.
+ * @property {string} [tipLabel='Toggle full-screen'] Text label to use for the button tip.
+ * @property {boolean} [keys=false] Full keyboard access.
+ * @property {HTMLElement|string} [target] Specify a target if you want the
+ * control to be rendered outside of the map's viewport.
+ * @property {HTMLElement|string} [source] The element to be displayed
+ * fullscreen. When not provided, the element containing the map viewport will
+ * be displayed fullscreen.
+ */
+
+/**
+ * @classdesc
+ * Provides a button that when clicked fills up the full screen with the map.
+ * The full screen source element is by default the element containing the map viewport unless
+ * overridden by providing the `source` option. In which case, the dom
+ * element introduced using this parameter will be displayed in full screen.
+ *
+ * When in full screen mode, a close button is shown to exit full screen mode.
+ * The [Fullscreen API](http://www.w3.org/TR/fullscreen/) is used to
+ * toggle the map in full screen mode.
+ *
+ * @api
+ */
+
+
+var FullScreen =
+/*@__PURE__*/
+function (Control) {
+  function FullScreen(opt_options) {
+    var options = opt_options ? opt_options : {};
+    Control.call(this, {
+      element: document.createElement('div'),
+      target: options.target
+    });
+    /**
+     * @private
+     * @type {string}
+     */
+
+    this.cssClassName_ = options.className !== undefined ? options.className : 'ol-full-screen';
+    var label = options.label !== undefined ? options.label : '\u2922';
+    /**
+     * @private
+     * @type {Text}
+     */
+
+    this.labelNode_ = typeof label === 'string' ? document.createTextNode(label) : label;
+    var labelActive = options.labelActive !== undefined ? options.labelActive : '\u00d7';
+    /**
+     * @private
+     * @type {Text}
+     */
+
+    this.labelActiveNode_ = typeof labelActive === 'string' ? document.createTextNode(labelActive) : labelActive;
+    /**
+     * @private
+     * @type {HTMLElement}
+     */
+
+    this.button_ = document.createElement('button');
+    var tipLabel = options.tipLabel ? options.tipLabel : 'Toggle full-screen';
+    this.setClassName_(this.button_, isFullScreen());
+    this.button_.setAttribute('type', 'button');
+    this.button_.title = tipLabel;
+    this.button_.appendChild(this.labelNode_);
+    (0, _events.listen)(this.button_, _EventType.default.CLICK, this.handleClick_, this);
+    var cssClasses = this.cssClassName_ + ' ' + _css.CLASS_UNSELECTABLE + ' ' + _css.CLASS_CONTROL + ' ' + (!isFullScreenSupported() ? _css.CLASS_UNSUPPORTED : '');
+    var element = this.element;
+    element.className = cssClasses;
+    element.appendChild(this.button_);
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.keys_ = options.keys !== undefined ? options.keys : false;
+    /**
+     * @private
+     * @type {HTMLElement|string|undefined}
+     */
+
+    this.source_ = options.source;
+  }
+
+  if (Control) FullScreen.__proto__ = Control;
+  FullScreen.prototype = Object.create(Control && Control.prototype);
+  FullScreen.prototype.constructor = FullScreen;
+  /**
+   * @param {MouseEvent} event The event to handle
+   * @private
+   */
+
+  FullScreen.prototype.handleClick_ = function handleClick_(event) {
+    event.preventDefault();
+    this.handleFullScreen_();
+  };
+  /**
+   * @private
+   */
+
+
+  FullScreen.prototype.handleFullScreen_ = function handleFullScreen_() {
+    if (!isFullScreenSupported()) {
+      return;
+    }
+
+    var map = this.getMap();
+
+    if (!map) {
+      return;
+    }
+
+    if (isFullScreen()) {
+      exitFullScreen();
+    } else {
+      var element;
+
+      if (this.source_) {
+        element = typeof this.source_ === 'string' ? document.getElementById(this.source_) : this.source_;
+      } else {
+        element = map.getTargetElement();
+      }
+
+      if (this.keys_) {
+        requestFullScreenWithKeys(element);
+      } else {
+        requestFullScreen(element);
+      }
+    }
+  };
+  /**
+   * @private
+   */
+
+
+  FullScreen.prototype.handleFullScreenChange_ = function handleFullScreenChange_() {
+    var map = this.getMap();
+
+    if (isFullScreen()) {
+      this.setClassName_(this.button_, true);
+      (0, _dom.replaceNode)(this.labelActiveNode_, this.labelNode_);
+    } else {
+      this.setClassName_(this.button_, false);
+      (0, _dom.replaceNode)(this.labelNode_, this.labelActiveNode_);
+    }
+
+    if (map) {
+      map.updateSize();
+    }
+  };
+  /**
+   * @param {HTMLElement} element Target element
+   * @param {boolean} fullscreen True if fullscreen class name should be active
+   * @private
+   */
+
+
+  FullScreen.prototype.setClassName_ = function setClassName_(element, fullscreen) {
+    var activeClassName = this.cssClassName_ + '-true';
+    var inactiveClassName = this.cssClassName_ + '-false';
+    var nextClassName = fullscreen ? activeClassName : inactiveClassName;
+    element.classList.remove(activeClassName);
+    element.classList.remove(inactiveClassName);
+    element.classList.add(nextClassName);
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  FullScreen.prototype.setMap = function setMap(map) {
+    Control.prototype.setMap.call(this, map);
+
+    if (map) {
+      this.listenerKeys.push((0, _events.listen)(document, getChangeType(), this.handleFullScreenChange_, this));
+    }
+  };
+
+  return FullScreen;
+}(_Control.default);
+/**
+ * @return {boolean} Fullscreen is supported by the current platform.
+ */
+
+
+function isFullScreenSupported() {
+  var body = document.body;
+  return !!(body.webkitRequestFullscreen || body.mozRequestFullScreen && document.mozFullScreenEnabled || body.msRequestFullscreen && document.msFullscreenEnabled || body.requestFullscreen && document.fullscreenEnabled);
+}
+/**
+ * @return {boolean} Element is currently in fullscreen.
+ */
+
+
+function isFullScreen() {
+  return !!(document.webkitIsFullScreen || document.mozFullScreen || document.msFullscreenElement || document.fullscreenElement);
+}
+/**
+ * Request to fullscreen an element.
+ * @param {HTMLElement} element Element to request fullscreen
+ */
+
+
+function requestFullScreen(element) {
+  if (element.requestFullscreen) {
+    element.requestFullscreen();
+  } else if (element.msRequestFullscreen) {
+    element.msRequestFullscreen();
+  } else if (element.mozRequestFullScreen) {
+    element.mozRequestFullScreen();
+  } else if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen();
+  }
+}
+/**
+ * Request to fullscreen an element with keyboard input.
+ * @param {HTMLElement} element Element to request fullscreen
+ */
+
+
+function requestFullScreenWithKeys(element) {
+  if (element.mozRequestFullScreenWithKeys) {
+    element.mozRequestFullScreenWithKeys();
+  } else if (element.webkitRequestFullscreen) {
+    element.webkitRequestFullscreen();
+  } else {
+    requestFullScreen(element);
+  }
+}
+/**
+ * Exit fullscreen.
+ */
+
+
+function exitFullScreen() {
+  if (document.exitFullscreen) {
+    document.exitFullscreen();
+  } else if (document.msExitFullscreen) {
+    document.msExitFullscreen();
+  } else if (document.mozCancelFullScreen) {
+    document.mozCancelFullScreen();
+  } else if (document.webkitExitFullscreen) {
+    document.webkitExitFullscreen();
+  }
+}
+
+var _default = FullScreen;
+exports.default = _default;
+},{"./Control.js":"../node_modules/ol/control/Control.js","../css.js":"../node_modules/ol/css.js","../dom.js":"../node_modules/ol/dom.js","../events.js":"../node_modules/ol/events.js","../events/EventType.js":"../node_modules/ol/events/EventType.js"}],"../node_modules/ol/control/MousePosition.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.render = render;
+exports.default = void 0;
+
+var _events = require("../events.js");
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _Object = require("../Object.js");
+
+var _Control = _interopRequireDefault(require("./Control.js"));
+
+var _proj = require("../proj.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/control/MousePosition
+ */
+
+/**
+ * @type {string}
+ */
+var PROJECTION = 'projection';
+/**
+ * @type {string}
+ */
+
+var COORDINATE_FORMAT = 'coordinateFormat';
+/**
+ * @typedef {Object} Options
+ * @property {string} [className='ol-mouse-position'] CSS class name.
+ * @property {import("../coordinate.js").CoordinateFormat} [coordinateFormat] Coordinate format.
+ * @property {import("../proj.js").ProjectionLike} [projection] Projection. Default is the view projection.
+ * @property {function(import("../MapEvent.js").default)} [render] Function called when the
+ * control should be re-rendered. This is called in a `requestAnimationFrame`
+ * callback.
+ * @property {HTMLElement|string} [target] Specify a target if you want the
+ * control to be rendered outside of the map's viewport.
+ * @property {string} [undefinedHTML='&#160;'] Markup to show when coordinates are not
+ * available (e.g. when the pointer leaves the map viewport).  By default, the last position
+ * will be replaced with `'&#160;'` (`&nbsp;`) when the pointer leaves the viewport.  To
+ * retain the last rendered position, set this option to something falsey (like an empty
+ * string `''`).
+ */
+
+/**
+ * @classdesc
+ * A control to show the 2D coordinates of the mouse cursor. By default, these
+ * are in the view projection, but can be in any supported projection.
+ * By default the control is shown in the top right corner of the map, but this
+ * can be changed by using the css selector `.ol-mouse-position`.
+ *
+ * On touch devices, which usually do not have a mouse cursor, the coordinates
+ * of the currently touched position are shown.
+ *
+ * @api
+ */
+
+var MousePosition =
+/*@__PURE__*/
+function (Control) {
+  function MousePosition(opt_options) {
+    var options = opt_options ? opt_options : {};
+    var element = document.createElement('div');
+    element.className = options.className !== undefined ? options.className : 'ol-mouse-position';
+    Control.call(this, {
+      element: element,
+      render: options.render || render,
+      target: options.target
+    });
+    (0, _events.listen)(this, (0, _Object.getChangeEventType)(PROJECTION), this.handleProjectionChanged_, this);
+
+    if (options.coordinateFormat) {
+      this.setCoordinateFormat(options.coordinateFormat);
+    }
+
+    if (options.projection) {
+      this.setProjection(options.projection);
+    }
+    /**
+     * @private
+     * @type {string}
+     */
+
+
+    this.undefinedHTML_ = options.undefinedHTML !== undefined ? options.undefinedHTML : '&#160;';
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.renderOnMouseOut_ = !!this.undefinedHTML_;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    this.renderedHTML_ = element.innerHTML;
+    /**
+     * @private
+     * @type {import("../proj/Projection.js").default}
+     */
+
+    this.mapProjection_ = null;
+    /**
+     * @private
+     * @type {?import("../proj.js").TransformFunction}
+     */
+
+    this.transform_ = null;
+    /**
+     * @private
+     * @type {import("../pixel.js").Pixel}
+     */
+
+    this.lastMouseMovePixel_ = null;
+  }
+
+  if (Control) MousePosition.__proto__ = Control;
+  MousePosition.prototype = Object.create(Control && Control.prototype);
+  MousePosition.prototype.constructor = MousePosition;
+  /**
+   * @private
+   */
+
+  MousePosition.prototype.handleProjectionChanged_ = function handleProjectionChanged_() {
+    this.transform_ = null;
+  };
+  /**
+   * Return the coordinate format type used to render the current position or
+   * undefined.
+   * @return {import("../coordinate.js").CoordinateFormat|undefined} The format to render the current
+   *     position in.
+   * @observable
+   * @api
+   */
+
+
+  MousePosition.prototype.getCoordinateFormat = function getCoordinateFormat() {
+    return (
+      /** @type {import("../coordinate.js").CoordinateFormat|undefined} */
+      this.get(COORDINATE_FORMAT)
+    );
+  };
+  /**
+   * Return the projection that is used to report the mouse position.
+   * @return {import("../proj/Projection.js").default|undefined} The projection to report mouse
+   *     position in.
+   * @observable
+   * @api
+   */
+
+
+  MousePosition.prototype.getProjection = function getProjection() {
+    return (
+      /** @type {import("../proj/Projection.js").default|undefined} */
+      this.get(PROJECTION)
+    );
+  };
+  /**
+   * @param {Event} event Browser event.
+   * @protected
+   */
+
+
+  MousePosition.prototype.handleMouseMove = function handleMouseMove(event) {
+    var map = this.getMap();
+    this.lastMouseMovePixel_ = map.getEventPixel(event);
+    this.updateHTML_(this.lastMouseMovePixel_);
+  };
+  /**
+   * @param {Event} event Browser event.
+   * @protected
+   */
+
+
+  MousePosition.prototype.handleMouseOut = function handleMouseOut(event) {
+    this.updateHTML_(null);
+    this.lastMouseMovePixel_ = null;
+  };
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+
+  MousePosition.prototype.setMap = function setMap(map) {
+    Control.prototype.setMap.call(this, map);
+
+    if (map) {
+      var viewport = map.getViewport();
+      this.listenerKeys.push((0, _events.listen)(viewport, _EventType.default.MOUSEMOVE, this.handleMouseMove, this), (0, _events.listen)(viewport, _EventType.default.TOUCHSTART, this.handleMouseMove, this));
+
+      if (this.renderOnMouseOut_) {
+        this.listenerKeys.push((0, _events.listen)(viewport, _EventType.default.MOUSEOUT, this.handleMouseOut, this), (0, _events.listen)(viewport, _EventType.default.TOUCHEND, this.handleMouseOut, this));
+      }
+    }
+  };
+  /**
+   * Set the coordinate format type used to render the current position.
+   * @param {import("../coordinate.js").CoordinateFormat} format The format to render the current
+   *     position in.
+   * @observable
+   * @api
+   */
+
+
+  MousePosition.prototype.setCoordinateFormat = function setCoordinateFormat(format) {
+    this.set(COORDINATE_FORMAT, format);
+  };
+  /**
+   * Set the projection that is used to report the mouse position.
+   * @param {import("../proj.js").ProjectionLike} projection The projection to report mouse
+   *     position in.
+   * @observable
+   * @api
+   */
+
+
+  MousePosition.prototype.setProjection = function setProjection(projection) {
+    this.set(PROJECTION, (0, _proj.get)(projection));
+  };
+  /**
+   * @param {?import("../pixel.js").Pixel} pixel Pixel.
+   * @private
+   */
+
+
+  MousePosition.prototype.updateHTML_ = function updateHTML_(pixel) {
+    var html = this.undefinedHTML_;
+
+    if (pixel && this.mapProjection_) {
+      if (!this.transform_) {
+        var projection = this.getProjection();
+
+        if (projection) {
+          this.transform_ = (0, _proj.getTransformFromProjections)(this.mapProjection_, projection);
+        } else {
+          this.transform_ = _proj.identityTransform;
+        }
+      }
+
+      var map = this.getMap();
+      var coordinate = map.getCoordinateFromPixel(pixel);
+
+      if (coordinate) {
+        this.transform_(coordinate, coordinate);
+        var coordinateFormat = this.getCoordinateFormat();
+
+        if (coordinateFormat) {
+          html = coordinateFormat(coordinate);
+        } else {
+          html = coordinate.toString();
+        }
+      }
+    }
+
+    if (!this.renderedHTML_ || html !== this.renderedHTML_) {
+      this.element.innerHTML = html;
+      this.renderedHTML_ = html;
+    }
+  };
+
+  return MousePosition;
+}(_Control.default);
+/**
+ * Update the projection. Rendering of the coordinates is done in
+ * `handleMouseMove` and `handleMouseUp`.
+ * @param {import("../MapEvent.js").default} mapEvent Map event.
+ * @this {MousePosition}
+ * @api
+ */
+
+
+function render(mapEvent) {
+  var frameState = mapEvent.frameState;
+
+  if (!frameState) {
+    this.mapProjection_ = null;
+  } else {
+    if (this.mapProjection_ != frameState.viewState.projection) {
+      this.mapProjection_ = frameState.viewState.projection;
+      this.transform_ = null;
+    }
+  }
+}
+
+var _default = MousePosition;
+exports.default = _default;
+},{"../events.js":"../node_modules/ol/events.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","../Object.js":"../node_modules/ol/Object.js","./Control.js":"../node_modules/ol/control/Control.js","../proj.js":"../node_modules/ol/proj.js"}],"../node_modules/ol/control/OverviewMap.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.render = render;
+exports.default = void 0;
+
+var _Collection = _interopRequireDefault(require("../Collection.js"));
+
+var _Map = _interopRequireDefault(require("../Map.js"));
+
+var _MapEventType = _interopRequireDefault(require("../MapEventType.js"));
+
+var _MapProperty = _interopRequireDefault(require("../MapProperty.js"));
+
+var _Object = require("../Object.js");
+
+var _ObjectEventType = _interopRequireDefault(require("../ObjectEventType.js"));
+
+var _Overlay = _interopRequireDefault(require("../Overlay.js"));
+
+var _OverlayPositioning = _interopRequireDefault(require("../OverlayPositioning.js"));
+
+var _ViewProperty = _interopRequireDefault(require("../ViewProperty.js"));
+
+var _Control = _interopRequireDefault(require("./Control.js"));
+
+var _coordinate = require("../coordinate.js");
+
+var _css = require("../css.js");
+
+var _dom = require("../dom.js");
+
+var _events = require("../events.js");
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _extent = require("../extent.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/control/OverviewMap
+ */
+
+/**
+ * Maximum width and/or height extent ratio that determines when the overview
+ * map should be zoomed out.
+ * @type {number}
+ */
+var MAX_RATIO = 0.75;
+/**
+ * Minimum width and/or height extent ratio that determines when the overview
+ * map should be zoomed in.
+ * @type {number}
+ */
+
+var MIN_RATIO = 0.1;
+/**
+ * @typedef {Object} Options
+ * @property {string} [className='ol-overviewmap'] CSS class name.
+ * @property {boolean} [collapsed=true] Whether the control should start collapsed or not (expanded).
+ * @property {string|HTMLElement} [collapseLabel='«'] Text label to use for the
+ * expanded overviewmap button. Instead of text, also an element (e.g. a `span` element) can be used.
+ * @property {boolean} [collapsible=true] Whether the control can be collapsed or not.
+ * @property {string|HTMLElement} [label='»'] Text label to use for the collapsed
+ * overviewmap button. Instead of text, also an element (e.g. a `span` element) can be used.
+ * @property {Array<import("../layer/Layer.js").default>|import("../Collection.js").default<import("../layer/Layer.js").default>} [layers]
+ * Layers for the overview map. If not set, then all main map layers are used
+ * instead.
+ * @property {function(import("../MapEvent.js").default)} [render] Function called when the control
+ * should be re-rendered. This is called in a `requestAnimationFrame` callback.
+ * @property {HTMLElement|string} [target] Specify a target if you want the control
+ * to be rendered outside of the map's viewport.
+ * @property {string} [tipLabel='Overview map'] Text label to use for the button tip.
+ * @property {import("../View.js").default} [view] Custom view for the overview map. If not provided,
+ * a default view with an EPSG:3857 projection will be used.
+ */
+
+/**
+ * Create a new control with a map acting as an overview map for an other
+ * defined map.
+ *
+ * @api
+ */
+
+var OverviewMap =
+/*@__PURE__*/
+function (Control) {
+  function OverviewMap(opt_options) {
+    var options = opt_options ? opt_options : {};
+    Control.call(this, {
+      element: document.createElement('div'),
+      render: options.render || render,
+      target: options.target
+    });
+    /**
+     * @type {boolean}
+     * @private
+     */
+
+    this.collapsed_ = options.collapsed !== undefined ? options.collapsed : true;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.collapsible_ = options.collapsible !== undefined ? options.collapsible : true;
+
+    if (!this.collapsible_) {
+      this.collapsed_ = false;
+    }
+
+    var className = options.className !== undefined ? options.className : 'ol-overviewmap';
+    var tipLabel = options.tipLabel !== undefined ? options.tipLabel : 'Overview map';
+    var collapseLabel = options.collapseLabel !== undefined ? options.collapseLabel : '\u00AB';
+
+    if (typeof collapseLabel === 'string') {
+      /**
+       * @private
+       * @type {HTMLElement}
+       */
+      this.collapseLabel_ = document.createElement('span');
+      this.collapseLabel_.textContent = collapseLabel;
+    } else {
+      this.collapseLabel_ = collapseLabel;
+    }
+
+    var label = options.label !== undefined ? options.label : '\u00BB';
+
+    if (typeof label === 'string') {
+      /**
+       * @private
+       * @type {HTMLElement}
+       */
+      this.label_ = document.createElement('span');
+      this.label_.textContent = label;
+    } else {
+      this.label_ = label;
+    }
+
+    var activeLabel = this.collapsible_ && !this.collapsed_ ? this.collapseLabel_ : this.label_;
+    var button = document.createElement('button');
+    button.setAttribute('type', 'button');
+    button.title = tipLabel;
+    button.appendChild(activeLabel);
+    (0, _events.listen)(button, _EventType.default.CLICK, this.handleClick_, this);
+    /**
+     * @type {HTMLElement}
+     * @private
+     */
+
+    this.ovmapDiv_ = document.createElement('div');
+    this.ovmapDiv_.className = 'ol-overviewmap-map';
+    /**
+     * @type {import("../Map.js").default}
+     * @private
+     */
+
+    this.ovmap_ = new _Map.default({
+      controls: new _Collection.default(),
+      interactions: new _Collection.default(),
+      view: options.view
+    });
+    var ovmap = this.ovmap_;
+
+    if (options.layers) {
+      /** @type {Array<import("../layer/Layer.js").default>} */
+      options.layers.forEach(
+      /**
+       * @param {import("../layer/Layer.js").default} layer Layer.
+       */
+      function (layer) {
+        ovmap.addLayer(layer);
+      }.bind(this));
+    }
+
+    var box = document.createElement('div');
+    box.className = 'ol-overviewmap-box';
+    box.style.boxSizing = 'border-box';
+    /**
+     * @type {import("../Overlay.js").default}
+     * @private
+     */
+
+    this.boxOverlay_ = new _Overlay.default({
+      position: [0, 0],
+      positioning: _OverlayPositioning.default.BOTTOM_LEFT,
+      element: box
+    });
+    this.ovmap_.addOverlay(this.boxOverlay_);
+    var cssClasses = className + ' ' + _css.CLASS_UNSELECTABLE + ' ' + _css.CLASS_CONTROL + (this.collapsed_ && this.collapsible_ ? ' ' + _css.CLASS_COLLAPSED : '') + (this.collapsible_ ? '' : ' ol-uncollapsible');
+    var element = this.element;
+    element.className = cssClasses;
+    element.appendChild(this.ovmapDiv_);
+    element.appendChild(button);
+    /* Interactive map */
+
+    var scope = this;
+    var overlay = this.boxOverlay_;
+    var overlayBox = this.boxOverlay_.getElement();
+    /* Functions definition */
+
+    var computeDesiredMousePosition = function (mousePosition) {
+      return {
+        clientX: mousePosition.clientX - overlayBox.offsetWidth / 2,
+        clientY: mousePosition.clientY + overlayBox.offsetHeight / 2
+      };
+    };
+
+    var move = function (event) {
+      var position =
+      /** @type {?} */
+      computeDesiredMousePosition(event);
+      var coordinates = ovmap.getEventCoordinate(
+      /** @type {Event} */
+      position);
+      overlay.setPosition(coordinates);
+    };
+
+    var endMoving = function (event) {
+      var coordinates = ovmap.getEventCoordinate(event);
+      scope.getMap().getView().setCenter(coordinates);
+      window.removeEventListener('mousemove', move);
+      window.removeEventListener('mouseup', endMoving);
+    };
+    /* Binding */
+
+
+    overlayBox.addEventListener('mousedown', function () {
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', endMoving);
+    });
+  }
+
+  if (Control) OverviewMap.__proto__ = Control;
+  OverviewMap.prototype = Object.create(Control && Control.prototype);
+  OverviewMap.prototype.constructor = OverviewMap;
+  /**
+   * @inheritDoc
+   * @api
+   */
+
+  OverviewMap.prototype.setMap = function setMap(map) {
+    var oldMap = this.getMap();
+
+    if (map === oldMap) {
+      return;
+    }
+
+    if (oldMap) {
+      var oldView = oldMap.getView();
+
+      if (oldView) {
+        this.unbindView_(oldView);
+      }
+
+      this.ovmap_.setTarget(null);
+    }
+
+    Control.prototype.setMap.call(this, map);
+
+    if (map) {
+      this.ovmap_.setTarget(this.ovmapDiv_);
+      this.listenerKeys.push((0, _events.listen)(map, _ObjectEventType.default.PROPERTYCHANGE, this.handleMapPropertyChange_, this)); // TODO: to really support map switching, this would need to be reworked
+
+      if (this.ovmap_.getLayers().getLength() === 0) {
+        this.ovmap_.setLayerGroup(map.getLayerGroup());
+      }
+
+      var view = map.getView();
+
+      if (view) {
+        this.bindView_(view);
+
+        if (view.isDef()) {
+          this.ovmap_.updateSize();
+          this.resetExtent_();
+        }
+      }
+    }
+  };
+  /**
+   * Handle map property changes.  This only deals with changes to the map's view.
+   * @param {import("../Object.js").ObjectEvent} event The propertychange event.
+   * @private
+   */
+
+
+  OverviewMap.prototype.handleMapPropertyChange_ = function handleMapPropertyChange_(event) {
+    if (event.key === _MapProperty.default.VIEW) {
+      var oldView =
+      /** @type {import("../View.js").default} */
+      event.oldValue;
+
+      if (oldView) {
+        this.unbindView_(oldView);
+      }
+
+      var newView = this.getMap().getView();
+      this.bindView_(newView);
+    }
+  };
+  /**
+   * Register listeners for view property changes.
+   * @param {import("../View.js").default} view The view.
+   * @private
+   */
+
+
+  OverviewMap.prototype.bindView_ = function bindView_(view) {
+    (0, _events.listen)(view, (0, _Object.getChangeEventType)(_ViewProperty.default.ROTATION), this.handleRotationChanged_, this);
+  };
+  /**
+   * Unregister listeners for view property changes.
+   * @param {import("../View.js").default} view The view.
+   * @private
+   */
+
+
+  OverviewMap.prototype.unbindView_ = function unbindView_(view) {
+    (0, _events.unlisten)(view, (0, _Object.getChangeEventType)(_ViewProperty.default.ROTATION), this.handleRotationChanged_, this);
+  };
+  /**
+   * Handle rotation changes to the main map.
+   * TODO: This should rotate the extent rectrangle instead of the
+   * overview map's view.
+   * @private
+   */
+
+
+  OverviewMap.prototype.handleRotationChanged_ = function handleRotationChanged_() {
+    this.ovmap_.getView().setRotation(this.getMap().getView().getRotation());
+  };
+  /**
+   * Reset the overview map extent if the box size (width or
+   * height) is less than the size of the overview map size times minRatio
+   * or is greater than the size of the overview size times maxRatio.
+   *
+   * If the map extent was not reset, the box size can fits in the defined
+   * ratio sizes. This method then checks if is contained inside the overview
+   * map current extent. If not, recenter the overview map to the current
+   * main map center location.
+   * @private
+   */
+
+
+  OverviewMap.prototype.validateExtent_ = function validateExtent_() {
+    var map = this.getMap();
+    var ovmap = this.ovmap_;
+
+    if (!map.isRendered() || !ovmap.isRendered()) {
+      return;
+    }
+
+    var mapSize =
+    /** @type {import("../size.js").Size} */
+    map.getSize();
+    var view = map.getView();
+    var extent = view.calculateExtent(mapSize);
+    var ovmapSize =
+    /** @type {import("../size.js").Size} */
+    ovmap.getSize();
+    var ovview = ovmap.getView();
+    var ovextent = ovview.calculateExtent(ovmapSize);
+    var topLeftPixel = ovmap.getPixelFromCoordinate((0, _extent.getTopLeft)(extent));
+    var bottomRightPixel = ovmap.getPixelFromCoordinate((0, _extent.getBottomRight)(extent));
+    var boxWidth = Math.abs(topLeftPixel[0] - bottomRightPixel[0]);
+    var boxHeight = Math.abs(topLeftPixel[1] - bottomRightPixel[1]);
+    var ovmapWidth = ovmapSize[0];
+    var ovmapHeight = ovmapSize[1];
+
+    if (boxWidth < ovmapWidth * MIN_RATIO || boxHeight < ovmapHeight * MIN_RATIO || boxWidth > ovmapWidth * MAX_RATIO || boxHeight > ovmapHeight * MAX_RATIO) {
+      this.resetExtent_();
+    } else if (!(0, _extent.containsExtent)(ovextent, extent)) {
+      this.recenter_();
+    }
+  };
+  /**
+   * Reset the overview map extent to half calculated min and max ratio times
+   * the extent of the main map.
+   * @private
+   */
+
+
+  OverviewMap.prototype.resetExtent_ = function resetExtent_() {
+    if (MAX_RATIO === 0 || MIN_RATIO === 0) {
+      return;
+    }
+
+    var map = this.getMap();
+    var ovmap = this.ovmap_;
+    var mapSize =
+    /** @type {import("../size.js").Size} */
+    map.getSize();
+    var view = map.getView();
+    var extent = view.calculateExtent(mapSize);
+    var ovview = ovmap.getView(); // get how many times the current map overview could hold different
+    // box sizes using the min and max ratio, pick the step in the middle used
+    // to calculate the extent from the main map to set it to the overview map,
+
+    var steps = Math.log(MAX_RATIO / MIN_RATIO) / Math.LN2;
+    var ratio = 1 / (Math.pow(2, steps / 2) * MIN_RATIO);
+    (0, _extent.scaleFromCenter)(extent, ratio);
+    ovview.fit(extent);
+  };
+  /**
+   * Set the center of the overview map to the map center without changing its
+   * resolution.
+   * @private
+   */
+
+
+  OverviewMap.prototype.recenter_ = function recenter_() {
+    var map = this.getMap();
+    var ovmap = this.ovmap_;
+    var view = map.getView();
+    var ovview = ovmap.getView();
+    ovview.setCenter(view.getCenter());
+  };
+  /**
+   * Update the box using the main map extent
+   * @private
+   */
+
+
+  OverviewMap.prototype.updateBox_ = function updateBox_() {
+    var map = this.getMap();
+    var ovmap = this.ovmap_;
+
+    if (!map.isRendered() || !ovmap.isRendered()) {
+      return;
+    }
+
+    var mapSize =
+    /** @type {import("../size.js").Size} */
+    map.getSize();
+    var view = map.getView();
+    var ovview = ovmap.getView();
+    var rotation = view.getRotation();
+    var overlay = this.boxOverlay_;
+    var box = this.boxOverlay_.getElement();
+    var extent = view.calculateExtent(mapSize);
+    var ovresolution = ovview.getResolution();
+    var bottomLeft = (0, _extent.getBottomLeft)(extent);
+    var topRight = (0, _extent.getTopRight)(extent); // set position using bottom left coordinates
+
+    var rotateBottomLeft = this.calculateCoordinateRotate_(rotation, bottomLeft);
+    overlay.setPosition(rotateBottomLeft); // set box size calculated from map extent size and overview map resolution
+
+    if (box) {
+      box.style.width = Math.abs((bottomLeft[0] - topRight[0]) / ovresolution) + 'px';
+      box.style.height = Math.abs((topRight[1] - bottomLeft[1]) / ovresolution) + 'px';
+    }
+  };
+  /**
+   * @param {number} rotation Target rotation.
+   * @param {import("../coordinate.js").Coordinate} coordinate Coordinate.
+   * @return {import("../coordinate.js").Coordinate|undefined} Coordinate for rotation and center anchor.
+   * @private
+   */
+
+
+  OverviewMap.prototype.calculateCoordinateRotate_ = function calculateCoordinateRotate_(rotation, coordinate) {
+    var coordinateRotate;
+    var map = this.getMap();
+    var view = map.getView();
+    var currentCenter = view.getCenter();
+
+    if (currentCenter) {
+      coordinateRotate = [coordinate[0] - currentCenter[0], coordinate[1] - currentCenter[1]];
+      (0, _coordinate.rotate)(coordinateRotate, rotation);
+      (0, _coordinate.add)(coordinateRotate, currentCenter);
+    }
+
+    return coordinateRotate;
+  };
+  /**
+   * @param {MouseEvent} event The event to handle
+   * @private
+   */
+
+
+  OverviewMap.prototype.handleClick_ = function handleClick_(event) {
+    event.preventDefault();
+    this.handleToggle_();
+  };
+  /**
+   * @private
+   */
+
+
+  OverviewMap.prototype.handleToggle_ = function handleToggle_() {
+    this.element.classList.toggle(_css.CLASS_COLLAPSED);
+
+    if (this.collapsed_) {
+      (0, _dom.replaceNode)(this.collapseLabel_, this.label_);
+    } else {
+      (0, _dom.replaceNode)(this.label_, this.collapseLabel_);
+    }
+
+    this.collapsed_ = !this.collapsed_; // manage overview map if it had not been rendered before and control
+    // is expanded
+
+    var ovmap = this.ovmap_;
+
+    if (!this.collapsed_ && !ovmap.isRendered()) {
+      ovmap.updateSize();
+      this.resetExtent_();
+      (0, _events.listenOnce)(ovmap, _MapEventType.default.POSTRENDER, function (event) {
+        this.updateBox_();
+      }, this);
+    }
+  };
+  /**
+   * Return `true` if the overview map is collapsible, `false` otherwise.
+   * @return {boolean} True if the widget is collapsible.
+   * @api
+   */
+
+
+  OverviewMap.prototype.getCollapsible = function getCollapsible() {
+    return this.collapsible_;
+  };
+  /**
+   * Set whether the overview map should be collapsible.
+   * @param {boolean} collapsible True if the widget is collapsible.
+   * @api
+   */
+
+
+  OverviewMap.prototype.setCollapsible = function setCollapsible(collapsible) {
+    if (this.collapsible_ === collapsible) {
+      return;
+    }
+
+    this.collapsible_ = collapsible;
+    this.element.classList.toggle('ol-uncollapsible');
+
+    if (!collapsible && this.collapsed_) {
+      this.handleToggle_();
+    }
+  };
+  /**
+   * Collapse or expand the overview map according to the passed parameter. Will
+   * not do anything if the overview map isn't collapsible or if the current
+   * collapsed state is already the one requested.
+   * @param {boolean} collapsed True if the widget is collapsed.
+   * @api
+   */
+
+
+  OverviewMap.prototype.setCollapsed = function setCollapsed(collapsed) {
+    if (!this.collapsible_ || this.collapsed_ === collapsed) {
+      return;
+    }
+
+    this.handleToggle_();
+  };
+  /**
+   * Determine if the overview map is collapsed.
+   * @return {boolean} The overview map is collapsed.
+   * @api
+   */
+
+
+  OverviewMap.prototype.getCollapsed = function getCollapsed() {
+    return this.collapsed_;
+  };
+  /**
+   * Return the overview map.
+   * @return {import("../PluggableMap.js").default} Overview map.
+   * @api
+   */
+
+
+  OverviewMap.prototype.getOverviewMap = function getOverviewMap() {
+    return this.ovmap_;
+  };
+
+  return OverviewMap;
+}(_Control.default);
+/**
+ * Update the overview map element.
+ * @param {import("../MapEvent.js").default} mapEvent Map event.
+ * @this {OverviewMap}
+ * @api
+ */
+
+
+function render(mapEvent) {
+  this.validateExtent_();
+  this.updateBox_();
+}
+
+var _default = OverviewMap;
+exports.default = _default;
+},{"../Collection.js":"../node_modules/ol/Collection.js","../Map.js":"../node_modules/ol/Map.js","../MapEventType.js":"../node_modules/ol/MapEventType.js","../MapProperty.js":"../node_modules/ol/MapProperty.js","../Object.js":"../node_modules/ol/Object.js","../ObjectEventType.js":"../node_modules/ol/ObjectEventType.js","../Overlay.js":"../node_modules/ol/Overlay.js","../OverlayPositioning.js":"../node_modules/ol/OverlayPositioning.js","../ViewProperty.js":"../node_modules/ol/ViewProperty.js","./Control.js":"../node_modules/ol/control/Control.js","../coordinate.js":"../node_modules/ol/coordinate.js","../css.js":"../node_modules/ol/css.js","../dom.js":"../node_modules/ol/dom.js","../events.js":"../node_modules/ol/events.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","../extent.js":"../node_modules/ol/extent.js"}],"../node_modules/ol/control/ScaleLine.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.render = render;
+exports.default = exports.Units = void 0;
+
+var _Object = require("../Object.js");
+
+var _asserts = require("../asserts.js");
+
+var _Control = _interopRequireDefault(require("./Control.js"));
+
+var _css = require("../css.js");
+
+var _events = require("../events.js");
+
+var _proj = require("../proj.js");
+
+var _Units = _interopRequireDefault(require("../proj/Units.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/control/ScaleLine
+ */
+
+/**
+ * @type {string}
+ */
+var UNITS_PROP = 'units';
+/**
+ * Units for the scale line. Supported values are `'degrees'`, `'imperial'`,
+ * `'nautical'`, `'metric'`, `'us'`.
+ * @enum {string}
+ */
+
+var Units = {
+  DEGREES: 'degrees',
+  IMPERIAL: 'imperial',
+  NAUTICAL: 'nautical',
+  METRIC: 'metric',
+  US: 'us'
+};
+/**
+ * @const
+ * @type {Array<number>}
+ */
+
+exports.Units = Units;
+var LEADING_DIGITS = [1, 2, 5];
+/**
+ * @typedef {Object} Options
+ * @property {string} [className='ol-scale-line'] CSS Class name.
+ * @property {number} [minWidth=64] Minimum width in pixels.
+ * @property {function(import("../MapEvent.js").default)} [render] Function called when the control
+ * should be re-rendered. This is called in a `requestAnimationFrame` callback.
+ * @property {HTMLElement|string} [target] Specify a target if you want the control
+ * to be rendered outside of the map's viewport.
+ * @property {Units|string} [units='metric'] Units.
+ */
+
+/**
+ * @classdesc
+ * A control displaying rough y-axis distances, calculated for the center of the
+ * viewport. For conformal projections (e.g. EPSG:3857, the default view
+ * projection in OpenLayers), the scale is valid for all directions.
+ * No scale line will be shown when the y-axis distance of a pixel at the
+ * viewport center cannot be calculated in the view projection.
+ * By default the scale line will show in the bottom left portion of the map,
+ * but this can be changed by using the css selector `.ol-scale-line`.
+ *
+ * @api
+ */
+
+var ScaleLine =
+/*@__PURE__*/
+function (Control) {
+  function ScaleLine(opt_options) {
+    var options = opt_options ? opt_options : {};
+    var className = options.className !== undefined ? options.className : 'ol-scale-line';
+    Control.call(this, {
+      element: document.createElement('div'),
+      render: options.render || render,
+      target: options.target
+    });
+    /**
+     * @private
+     * @type {HTMLElement}
+     */
+
+    this.innerElement_ = document.createElement('div');
+    this.innerElement_.className = className + '-inner';
+    this.element.className = className + ' ' + _css.CLASS_UNSELECTABLE;
+    this.element.appendChild(this.innerElement_);
+    /**
+     * @private
+     * @type {?import("../View.js").State}
+     */
+
+    this.viewState_ = null;
+    /**
+     * @private
+     * @type {number}
+     */
+
+    this.minWidth_ = options.minWidth !== undefined ? options.minWidth : 64;
+    /**
+     * @private
+     * @type {boolean}
+     */
+
+    this.renderedVisible_ = false;
+    /**
+     * @private
+     * @type {number|undefined}
+     */
+
+    this.renderedWidth_ = undefined;
+    /**
+     * @private
+     * @type {string}
+     */
+
+    this.renderedHTML_ = '';
+    (0, _events.listen)(this, (0, _Object.getChangeEventType)(UNITS_PROP), this.handleUnitsChanged_, this);
+    this.setUnits(
+    /** @type {Units} */
+    options.units || Units.METRIC);
+  }
+
+  if (Control) ScaleLine.__proto__ = Control;
+  ScaleLine.prototype = Object.create(Control && Control.prototype);
+  ScaleLine.prototype.constructor = ScaleLine;
+  /**
+   * Return the units to use in the scale line.
+   * @return {Units} The units
+   * to use in the scale line.
+   * @observable
+   * @api
+   */
+
+  ScaleLine.prototype.getUnits = function getUnits() {
+    return this.get(UNITS_PROP);
+  };
+  /**
+   * @private
+   */
+
+
+  ScaleLine.prototype.handleUnitsChanged_ = function handleUnitsChanged_() {
+    this.updateElement_();
+  };
+  /**
+   * Set the units to use in the scale line.
+   * @param {Units} units The units to use in the scale line.
+   * @observable
+   * @api
+   */
+
+
+  ScaleLine.prototype.setUnits = function setUnits(units) {
+    this.set(UNITS_PROP, units);
+  };
+  /**
+   * @private
+   */
+
+
+  ScaleLine.prototype.updateElement_ = function updateElement_() {
+    var viewState = this.viewState_;
+
+    if (!viewState) {
+      if (this.renderedVisible_) {
+        this.element.style.display = 'none';
+        this.renderedVisible_ = false;
+      }
+
+      return;
+    }
+
+    var center = viewState.center;
+    var projection = viewState.projection;
+    var units = this.getUnits();
+    var pointResolutionUnits = units == Units.DEGREES ? _Units.default.DEGREES : _Units.default.METERS;
+    var pointResolution = (0, _proj.getPointResolution)(projection, viewState.resolution, center, pointResolutionUnits);
+
+    if (projection.getUnits() != _Units.default.DEGREES && projection.getMetersPerUnit() && pointResolutionUnits == _Units.default.METERS) {
+      pointResolution *= projection.getMetersPerUnit();
+    }
+
+    var nominalCount = this.minWidth_ * pointResolution;
+    var suffix = '';
+
+    if (units == Units.DEGREES) {
+      var metersPerDegree = _proj.METERS_PER_UNIT[_Units.default.DEGREES];
+
+      if (projection.getUnits() == _Units.default.DEGREES) {
+        nominalCount *= metersPerDegree;
+      } else {
+        pointResolution /= metersPerDegree;
+      }
+
+      if (nominalCount < metersPerDegree / 60) {
+        suffix = '\u2033'; // seconds
+
+        pointResolution *= 3600;
+      } else if (nominalCount < metersPerDegree) {
+        suffix = '\u2032'; // minutes
+
+        pointResolution *= 60;
+      } else {
+        suffix = '\u00b0'; // degrees
+      }
+    } else if (units == Units.IMPERIAL) {
+      if (nominalCount < 0.9144) {
+        suffix = 'in';
+        pointResolution /= 0.0254;
+      } else if (nominalCount < 1609.344) {
+        suffix = 'ft';
+        pointResolution /= 0.3048;
+      } else {
+        suffix = 'mi';
+        pointResolution /= 1609.344;
+      }
+    } else if (units == Units.NAUTICAL) {
+      pointResolution /= 1852;
+      suffix = 'nm';
+    } else if (units == Units.METRIC) {
+      if (nominalCount < 0.001) {
+        suffix = 'μm';
+        pointResolution *= 1000000;
+      } else if (nominalCount < 1) {
+        suffix = 'mm';
+        pointResolution *= 1000;
+      } else if (nominalCount < 1000) {
+        suffix = 'm';
+      } else {
+        suffix = 'km';
+        pointResolution /= 1000;
+      }
+    } else if (units == Units.US) {
+      if (nominalCount < 0.9144) {
+        suffix = 'in';
+        pointResolution *= 39.37;
+      } else if (nominalCount < 1609.344) {
+        suffix = 'ft';
+        pointResolution /= 0.30480061;
+      } else {
+        suffix = 'mi';
+        pointResolution /= 1609.3472;
+      }
+    } else {
+      (0, _asserts.assert)(false, 33); // Invalid units
+    }
+
+    var i = 3 * Math.floor(Math.log(this.minWidth_ * pointResolution) / Math.log(10));
+    var count, width;
+
+    while (true) {
+      count = LEADING_DIGITS[(i % 3 + 3) % 3] * Math.pow(10, Math.floor(i / 3));
+      width = Math.round(count / pointResolution);
+
+      if (isNaN(width)) {
+        this.element.style.display = 'none';
+        this.renderedVisible_ = false;
+        return;
+      } else if (width >= this.minWidth_) {
+        break;
+      }
+
+      ++i;
+    }
+
+    var html = count + ' ' + suffix;
+
+    if (this.renderedHTML_ != html) {
+      this.innerElement_.innerHTML = html;
+      this.renderedHTML_ = html;
+    }
+
+    if (this.renderedWidth_ != width) {
+      this.innerElement_.style.width = width + 'px';
+      this.renderedWidth_ = width;
+    }
+
+    if (!this.renderedVisible_) {
+      this.element.style.display = '';
+      this.renderedVisible_ = true;
+    }
+  };
+
+  return ScaleLine;
+}(_Control.default);
+/**
+ * Update the scale line element.
+ * @param {import("../MapEvent.js").default} mapEvent Map event.
+ * @this {ScaleLine}
+ * @api
+ */
+
+
+function render(mapEvent) {
+  var frameState = mapEvent.frameState;
+
+  if (!frameState) {
+    this.viewState_ = null;
+  } else {
+    this.viewState_ = frameState.viewState;
+  }
+
+  this.updateElement_();
+}
+
+var _default = ScaleLine;
+exports.default = _default;
+},{"../Object.js":"../node_modules/ol/Object.js","../asserts.js":"../node_modules/ol/asserts.js","./Control.js":"../node_modules/ol/control/Control.js","../css.js":"../node_modules/ol/css.js","../events.js":"../node_modules/ol/events.js","../proj.js":"../node_modules/ol/proj.js","../proj/Units.js":"../node_modules/ol/proj/Units.js"}],"../node_modules/ol/control/ZoomSlider.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.render = render;
+exports.default = void 0;
+
+var _ViewHint = _interopRequireDefault(require("../ViewHint.js"));
+
+var _Control = _interopRequireDefault(require("./Control.js"));
+
+var _css = require("../css.js");
+
+var _easing = require("../easing.js");
+
+var _events = require("../events.js");
+
+var _Event = require("../events/Event.js");
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _math = require("../math.js");
+
+var _EventType2 = _interopRequireDefault(require("../pointer/EventType.js"));
+
+var _PointerEventHandler = _interopRequireDefault(require("../pointer/PointerEventHandler.js"));
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/control/ZoomSlider
+ */
+
+/**
+ * The enum for available directions.
+ *
+ * @enum {number}
+ */
+var Direction = {
+  VERTICAL: 0,
+  HORIZONTAL: 1
+};
+/**
+ * @typedef {Object} Options
+ * @property {string} [className='ol-zoomslider'] CSS class name.
+ * @property {number} [duration=200] Animation duration in milliseconds.
+ * @property {function(import("../MapEvent.js").default)} [render] Function called when the control
+ * should be re-rendered. This is called in a `requestAnimationFrame` callback.
+ */
+
+/**
+ * @classdesc
+ * A slider type of control for zooming.
+ *
+ * Example:
+ *
+ *     map.addControl(new ZoomSlider());
+ *
+ * @api
+ */
+
+var ZoomSlider =
+/*@__PURE__*/
+function (Control) {
+  function ZoomSlider(opt_options) {
+    var options = opt_options ? opt_options : {};
+    Control.call(this, {
+      element: document.createElement('div'),
+      render: options.render || render
+    });
+    /**
+      * @type {!Array.<import("../events.js").EventsKey>}
+      * @private
+      */
+
+    this.dragListenerKeys_ = [];
+    /**
+     * Will hold the current resolution of the view.
+     *
+     * @type {number|undefined}
+     * @private
+     */
+
+    this.currentResolution_ = undefined;
+    /**
+     * The direction of the slider. Will be determined from actual display of the
+     * container and defaults to Direction.VERTICAL.
+     *
+     * @type {Direction}
+     * @private
+     */
+
+    this.direction_ = Direction.VERTICAL;
+    /**
+     * @type {boolean}
+     * @private
+     */
+
+    this.dragging_;
+    /**
+     * @type {number}
+     * @private
+     */
+
+    this.heightLimit_ = 0;
+    /**
+     * @type {number}
+     * @private
+     */
+
+    this.widthLimit_ = 0;
+    /**
+     * @type {number|undefined}
+     * @private
+     */
+
+    this.previousX_;
+    /**
+     * @type {number|undefined}
+     * @private
+     */
+
+    this.previousY_;
+    /**
+     * The calculated thumb size (border box plus margins).  Set when initSlider_
+     * is called.
+     * @type {import("../size.js").Size}
+     * @private
+     */
+
+    this.thumbSize_ = null;
+    /**
+     * Whether the slider is initialized.
+     * @type {boolean}
+     * @private
+     */
+
+    this.sliderInitialized_ = false;
+    /**
+     * @type {number}
+     * @private
+     */
+
+    this.duration_ = options.duration !== undefined ? options.duration : 200;
+    var className = options.className !== undefined ? options.className : 'ol-zoomslider';
+    var thumbElement = document.createElement('button');
+    thumbElement.setAttribute('type', 'button');
+    thumbElement.className = className + '-thumb ' + _css.CLASS_UNSELECTABLE;
+    var containerElement = this.element;
+    containerElement.className = className + ' ' + _css.CLASS_UNSELECTABLE + ' ' + _css.CLASS_CONTROL;
+    containerElement.appendChild(thumbElement);
+    /**
+     * @type {PointerEventHandler}
+     * @private
+     */
+
+    this.dragger_ = new _PointerEventHandler.default(containerElement);
+    (0, _events.listen)(this.dragger_, _EventType2.default.POINTERDOWN, this.handleDraggerStart_, this);
+    (0, _events.listen)(this.dragger_, _EventType2.default.POINTERMOVE, this.handleDraggerDrag_, this);
+    (0, _events.listen)(this.dragger_, _EventType2.default.POINTERUP, this.handleDraggerEnd_, this);
+    (0, _events.listen)(containerElement, _EventType.default.CLICK, this.handleContainerClick_, this);
+    (0, _events.listen)(thumbElement, _EventType.default.CLICK, _Event.stopPropagation);
+  }
+
+  if (Control) ZoomSlider.__proto__ = Control;
+  ZoomSlider.prototype = Object.create(Control && Control.prototype);
+  ZoomSlider.prototype.constructor = ZoomSlider;
+  /**
+   * @inheritDoc
+   */
+
+  ZoomSlider.prototype.disposeInternal = function disposeInternal() {
+    this.dragger_.dispose();
+    Control.prototype.disposeInternal.call(this);
+  };
+  /**
+   * @inheritDoc
+   */
+
+
+  ZoomSlider.prototype.setMap = function setMap(map) {
+    Control.prototype.setMap.call(this, map);
+
+    if (map) {
+      map.render();
+    }
+  };
+  /**
+   * Initializes the slider element. This will determine and set this controls
+   * direction_ and also constrain the dragging of the thumb to always be within
+   * the bounds of the container.
+   *
+   * @private
+   */
+
+
+  ZoomSlider.prototype.initSlider_ = function initSlider_() {
+    var container = this.element;
+    var containerSize = {
+      width: container.offsetWidth,
+      height: container.offsetHeight
+    };
+    var thumb =
+    /** @type {HTMLElement} */
+    container.firstElementChild;
+    var computedStyle = getComputedStyle(thumb);
+    var thumbWidth = thumb.offsetWidth + parseFloat(computedStyle['marginRight']) + parseFloat(computedStyle['marginLeft']);
+    var thumbHeight = thumb.offsetHeight + parseFloat(computedStyle['marginTop']) + parseFloat(computedStyle['marginBottom']);
+    this.thumbSize_ = [thumbWidth, thumbHeight];
+
+    if (containerSize.width > containerSize.height) {
+      this.direction_ = Direction.HORIZONTAL;
+      this.widthLimit_ = containerSize.width - thumbWidth;
+    } else {
+      this.direction_ = Direction.VERTICAL;
+      this.heightLimit_ = containerSize.height - thumbHeight;
+    }
+
+    this.sliderInitialized_ = true;
+  };
+  /**
+   * @param {MouseEvent} event The browser event to handle.
+   * @private
+   */
+
+
+  ZoomSlider.prototype.handleContainerClick_ = function handleContainerClick_(event) {
+    var view = this.getMap().getView();
+    var relativePosition = this.getRelativePosition_(event.offsetX - this.thumbSize_[0] / 2, event.offsetY - this.thumbSize_[1] / 2);
+    var resolution = this.getResolutionForPosition_(relativePosition);
+    view.animate({
+      resolution: view.constrainResolution(resolution),
+      duration: this.duration_,
+      easing: _easing.easeOut
+    });
+  };
+  /**
+   * Handle dragger start events.
+   * @param {import("../pointer/PointerEvent.js").default} event The drag event.
+   * @private
+   */
+
+
+  ZoomSlider.prototype.handleDraggerStart_ = function handleDraggerStart_(event) {
+    if (!this.dragging_ && event.originalEvent.target === this.element.firstElementChild) {
+      this.getMap().getView().setHint(_ViewHint.default.INTERACTING, 1);
+      this.previousX_ = event.clientX;
+      this.previousY_ = event.clientY;
+      this.dragging_ = true;
+
+      if (this.dragListenerKeys_.length === 0) {
+        var drag = this.handleDraggerDrag_;
+        var end = this.handleDraggerEnd_;
+        this.dragListenerKeys_.push((0, _events.listen)(document, _EventType.default.MOUSEMOVE, drag, this), (0, _events.listen)(document, _EventType2.default.POINTERMOVE, drag, this), (0, _events.listen)(document, _EventType.default.MOUSEUP, end, this), (0, _events.listen)(document, _EventType2.default.POINTERUP, end, this));
+      }
+    }
+  };
+  /**
+   * Handle dragger drag events.
+   *
+   * @param {import("../pointer/PointerEvent.js").default} event The drag event.
+   * @private
+   */
+
+
+  ZoomSlider.prototype.handleDraggerDrag_ = function handleDraggerDrag_(event) {
+    if (this.dragging_) {
+      var element =
+      /** @type {HTMLElement} */
+      this.element.firstElementChild;
+      var deltaX = event.clientX - this.previousX_ + parseFloat(element.style.left);
+      var deltaY = event.clientY - this.previousY_ + parseFloat(element.style.top);
+      var relativePosition = this.getRelativePosition_(deltaX, deltaY);
+      this.currentResolution_ = this.getResolutionForPosition_(relativePosition);
+      this.getMap().getView().setResolution(this.currentResolution_);
+      this.setThumbPosition_(this.currentResolution_);
+      this.previousX_ = event.clientX;
+      this.previousY_ = event.clientY;
+    }
+  };
+  /**
+   * Handle dragger end events.
+   * @param {import("../pointer/PointerEvent.js").default} event The drag event.
+   * @private
+   */
+
+
+  ZoomSlider.prototype.handleDraggerEnd_ = function handleDraggerEnd_(event) {
+    if (this.dragging_) {
+      var view = this.getMap().getView();
+      view.setHint(_ViewHint.default.INTERACTING, -1);
+      view.animate({
+        resolution: view.constrainResolution(this.currentResolution_),
+        duration: this.duration_,
+        easing: _easing.easeOut
+      });
+      this.dragging_ = false;
+      this.previousX_ = undefined;
+      this.previousY_ = undefined;
+      this.dragListenerKeys_.forEach(_events.unlistenByKey);
+      this.dragListenerKeys_.length = 0;
+    }
+  };
+  /**
+   * Positions the thumb inside its container according to the given resolution.
+   *
+   * @param {number} res The res.
+   * @private
+   */
+
+
+  ZoomSlider.prototype.setThumbPosition_ = function setThumbPosition_(res) {
+    var position = this.getPositionForResolution_(res);
+    var thumb =
+    /** @type {HTMLElement} */
+    this.element.firstElementChild;
+
+    if (this.direction_ == Direction.HORIZONTAL) {
+      thumb.style.left = this.widthLimit_ * position + 'px';
+    } else {
+      thumb.style.top = this.heightLimit_ * position + 'px';
+    }
+  };
+  /**
+   * Calculates the relative position of the thumb given x and y offsets.  The
+   * relative position scales from 0 to 1.  The x and y offsets are assumed to be
+   * in pixel units within the dragger limits.
+   *
+   * @param {number} x Pixel position relative to the left of the slider.
+   * @param {number} y Pixel position relative to the top of the slider.
+   * @return {number} The relative position of the thumb.
+   * @private
+   */
+
+
+  ZoomSlider.prototype.getRelativePosition_ = function getRelativePosition_(x, y) {
+    var amount;
+
+    if (this.direction_ === Direction.HORIZONTAL) {
+      amount = x / this.widthLimit_;
+    } else {
+      amount = y / this.heightLimit_;
+    }
+
+    return (0, _math.clamp)(amount, 0, 1);
+  };
+  /**
+   * Calculates the corresponding resolution of the thumb given its relative
+   * position (where 0 is the minimum and 1 is the maximum).
+   *
+   * @param {number} position The relative position of the thumb.
+   * @return {number} The corresponding resolution.
+   * @private
+   */
+
+
+  ZoomSlider.prototype.getResolutionForPosition_ = function getResolutionForPosition_(position) {
+    var fn = this.getMap().getView().getResolutionForValueFunction();
+    return fn(1 - position);
+  };
+  /**
+   * Determines the relative position of the slider for the given resolution.  A
+   * relative position of 0 corresponds to the minimum view resolution.  A
+   * relative position of 1 corresponds to the maximum view resolution.
+   *
+   * @param {number} res The resolution.
+   * @return {number} The relative position value (between 0 and 1).
+   * @private
+   */
+
+
+  ZoomSlider.prototype.getPositionForResolution_ = function getPositionForResolution_(res) {
+    var fn = this.getMap().getView().getValueForResolutionFunction();
+    return 1 - fn(res);
+  };
+
+  return ZoomSlider;
+}(_Control.default);
+/**
+ * Update the zoomslider element.
+ * @param {import("../MapEvent.js").default} mapEvent Map event.
+ * @this {ZoomSlider}
+ * @api
+ */
+
+
+function render(mapEvent) {
+  if (!mapEvent.frameState) {
+    return;
+  }
+
+  if (!this.sliderInitialized_) {
+    this.initSlider_();
+  }
+
+  var res = mapEvent.frameState.viewState.resolution;
+
+  if (res !== this.currentResolution_) {
+    this.currentResolution_ = res;
+    this.setThumbPosition_(res);
+  }
+}
+
+var _default = ZoomSlider;
+exports.default = _default;
+},{"../ViewHint.js":"../node_modules/ol/ViewHint.js","./Control.js":"../node_modules/ol/control/Control.js","../css.js":"../node_modules/ol/css.js","../easing.js":"../node_modules/ol/easing.js","../events.js":"../node_modules/ol/events.js","../events/Event.js":"../node_modules/ol/events/Event.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","../math.js":"../node_modules/ol/math.js","../pointer/EventType.js":"../node_modules/ol/pointer/EventType.js","../pointer/PointerEventHandler.js":"../node_modules/ol/pointer/PointerEventHandler.js"}],"../node_modules/ol/control/ZoomToExtent.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.default = void 0;
+
+var _events = require("../events.js");
+
+var _EventType = _interopRequireDefault(require("../events/EventType.js"));
+
+var _Control = _interopRequireDefault(require("./Control.js"));
+
+var _css = require("../css.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+/**
+ * @module ol/control/ZoomToExtent
+ */
+
+/**
+ * @typedef {Object} Options
+ * @property {string} [className='ol-zoom-extent'] Class name.
+ * @property {HTMLElement|string} [target] Specify a target if you want the control
+ * to be rendered outside of the map's viewport.
+ * @property {string|HTMLElement} [label='E'] Text label to use for the button.
+ * Instead of text, also an element (e.g. a `span` element) can be used.
+ * @property {string} [tipLabel='Fit to extent'] Text label to use for the button tip.
+ * @property {import("../extent.js").Extent} [extent] The extent to zoom to. If undefined the validity
+ * extent of the view projection is used.
+ */
+
+/**
+ * @classdesc
+ * A button control which, when pressed, changes the map view to a specific
+ * extent. To style this control use the css selector `.ol-zoom-extent`.
+ *
+ * @api
+ */
+var ZoomToExtent =
+/*@__PURE__*/
+function (Control) {
+  function ZoomToExtent(opt_options) {
+    var options = opt_options ? opt_options : {};
+    Control.call(this, {
+      element: document.createElement('div'),
+      target: options.target
+    });
+    /**
+     * @type {import("../extent.js").Extent}
+     * @protected
+     */
+
+    this.extent = options.extent ? options.extent : null;
+    var className = options.className !== undefined ? options.className : 'ol-zoom-extent';
+    var label = options.label !== undefined ? options.label : 'E';
+    var tipLabel = options.tipLabel !== undefined ? options.tipLabel : 'Fit to extent';
+    var button = document.createElement('button');
+    button.setAttribute('type', 'button');
+    button.title = tipLabel;
+    button.appendChild(typeof label === 'string' ? document.createTextNode(label) : label);
+    (0, _events.listen)(button, _EventType.default.CLICK, this.handleClick_, this);
+    var cssClasses = className + ' ' + _css.CLASS_UNSELECTABLE + ' ' + _css.CLASS_CONTROL;
+    var element = this.element;
+    element.className = cssClasses;
+    element.appendChild(button);
+  }
+
+  if (Control) ZoomToExtent.__proto__ = Control;
+  ZoomToExtent.prototype = Object.create(Control && Control.prototype);
+  ZoomToExtent.prototype.constructor = ZoomToExtent;
+  /**
+   * @param {MouseEvent} event The event to handle
+   * @private
+   */
+
+  ZoomToExtent.prototype.handleClick_ = function handleClick_(event) {
+    event.preventDefault();
+    this.handleZoomToExtent();
+  };
+  /**
+   * @protected
+   */
+
+
+  ZoomToExtent.prototype.handleZoomToExtent = function handleZoomToExtent() {
+    var map = this.getMap();
+    var view = map.getView();
+    var extent = !this.extent ? view.getProjection().getExtent() : this.extent;
+    view.fit(extent);
+  };
+
+  return ZoomToExtent;
+}(_Control.default);
+
+var _default = ZoomToExtent;
+exports.default = _default;
+},{"../events.js":"../node_modules/ol/events.js","../events/EventType.js":"../node_modules/ol/events/EventType.js","./Control.js":"../node_modules/ol/control/Control.js","../css.js":"../node_modules/ol/css.js"}],"../node_modules/ol/control.js":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+Object.defineProperty(exports, "Attribution", {
+  enumerable: true,
+  get: function () {
+    return _Attribution.default;
+  }
+});
+Object.defineProperty(exports, "Control", {
+  enumerable: true,
+  get: function () {
+    return _Control.default;
+  }
+});
+Object.defineProperty(exports, "FullScreen", {
+  enumerable: true,
+  get: function () {
+    return _FullScreen.default;
+  }
+});
+Object.defineProperty(exports, "MousePosition", {
+  enumerable: true,
+  get: function () {
+    return _MousePosition.default;
+  }
+});
+Object.defineProperty(exports, "OverviewMap", {
+  enumerable: true,
+  get: function () {
+    return _OverviewMap.default;
+  }
+});
+Object.defineProperty(exports, "Rotate", {
+  enumerable: true,
+  get: function () {
+    return _Rotate.default;
+  }
+});
+Object.defineProperty(exports, "ScaleLine", {
+  enumerable: true,
+  get: function () {
+    return _ScaleLine.default;
+  }
+});
+Object.defineProperty(exports, "Zoom", {
+  enumerable: true,
+  get: function () {
+    return _Zoom.default;
+  }
+});
+Object.defineProperty(exports, "ZoomSlider", {
+  enumerable: true,
+  get: function () {
+    return _ZoomSlider.default;
+  }
+});
+Object.defineProperty(exports, "ZoomToExtent", {
+  enumerable: true,
+  get: function () {
+    return _ZoomToExtent.default;
+  }
+});
+Object.defineProperty(exports, "defaults", {
+  enumerable: true,
+  get: function () {
+    return _util.defaults;
+  }
+});
+
+var _Attribution = _interopRequireDefault(require("./control/Attribution.js"));
+
+var _Control = _interopRequireDefault(require("./control/Control.js"));
+
+var _FullScreen = _interopRequireDefault(require("./control/FullScreen.js"));
+
+var _MousePosition = _interopRequireDefault(require("./control/MousePosition.js"));
+
+var _OverviewMap = _interopRequireDefault(require("./control/OverviewMap.js"));
+
+var _Rotate = _interopRequireDefault(require("./control/Rotate.js"));
+
+var _ScaleLine = _interopRequireDefault(require("./control/ScaleLine.js"));
+
+var _Zoom = _interopRequireDefault(require("./control/Zoom.js"));
+
+var _ZoomSlider = _interopRequireDefault(require("./control/ZoomSlider.js"));
+
+var _ZoomToExtent = _interopRequireDefault(require("./control/ZoomToExtent.js"));
+
+var _util = require("./control/util.js");
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+},{"./control/Attribution.js":"../node_modules/ol/control/Attribution.js","./control/Control.js":"../node_modules/ol/control/Control.js","./control/FullScreen.js":"../node_modules/ol/control/FullScreen.js","./control/MousePosition.js":"../node_modules/ol/control/MousePosition.js","./control/OverviewMap.js":"../node_modules/ol/control/OverviewMap.js","./control/Rotate.js":"../node_modules/ol/control/Rotate.js","./control/ScaleLine.js":"../node_modules/ol/control/ScaleLine.js","./control/Zoom.js":"../node_modules/ol/control/Zoom.js","./control/ZoomSlider.js":"../node_modules/ol/control/ZoomSlider.js","./control/ZoomToExtent.js":"../node_modules/ol/control/ZoomToExtent.js","./control/util.js":"../node_modules/ol/control/util.js"}],"../node_modules/process/browser.js":[function(require,module,exports) {
 
 // shim for using process in browser
 var process = module.exports = {}; // cached from whatever global is present so that test runners that stub it
@@ -79391,13 +81508,41 @@ var _layer = require("ol/layer.js");
 
 var _Vector = _interopRequireDefault(require("ol/source/Vector.js"));
 
+var _interaction = require("ol/interaction.js");
+
+var _control = require("ol/control.js");
+
+var _Feature = _interopRequireDefault(require("ol/Feature.js"));
+
+var _Point = _interopRequireDefault(require("ol/geom/Point"));
+
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+/**
+ * 引入jquery
+ * */
 var $ = require("jquery");
+/**
+ * 存储选中元素存储的变量
+ * 保存被选中的元素
+ * */
+
+
+var selectedFeature = null;
+/**
+ * 存储是否处于添加状态的变量
+ * 点击添加元素按钮，设置为true，添加完元素后设置为false，保证一次只添加一个元素
+ * */
+
+var addStatusFlag = false;
+/**
+ * 存储是否处于删除状态的变量
+ * */
+
+var deleteStatusFlag = false;
 /**
  * overlay的元素
  */
-
 
 var container = document.getElementById('popup');
 var content = document.getElementById('popup-content');
@@ -79420,6 +81565,8 @@ var overlay = new _Overlay.default({
  */
 
 closer.onclick = function () {
+  //关闭标签的时候把选中元素设置为空
+  selectedFeature = null;
   overlay.setPosition(undefined);
   closer.blur();
   return false;
@@ -79432,7 +81579,7 @@ closer.onclick = function () {
 var wmsSource = new _ImageWMS.default({
   url: 'http://192.168.50.254:12222/geoserver/postgis/wms',
   params: {
-    'LAYERS': 'postgis:环翠区海洋牧场位置 （测绘院）',
+    'LAYERS': 'postgis:环翠区海洋牧场位置',
     'VERSION': '1.1.1'
   },
   serverType: 'geoserver'
@@ -79442,85 +81589,317 @@ var wmsLayer = new _Image.default({
 });
 /**
  * geoserver WFS服务
+ *
  * */
 
 var vectorSource = new _Vector.default();
 var vector = new _layer.Vector({
-  source: vectorSource // style: new Style({
-  //     stroke: new Stroke({
-  //         color: 'rgba(0, 0, 255, 1.0)',
-  //         width: 2
-  //     })
-  // })
+  source: vectorSource
+}); //定义一个选择交互
 
-}); //http请求数据
+var select = new _interaction.Select();
+/**
+ * 自定义属性修改地图控件
+ * */
 
-fetch('http://192.168.50.254:12222/geoserver/postgis/wfs?' + 'service=wfs&' + 'version=2.0.0&' + 'request=GetFeature&' + 'typeNames=postgis:环翠区海洋牧场位置 （测绘院）&' + 'outputFormat=application/json', {
-  method: 'GET'
-}).then(function (response) {
-  console.log(response);
-  return response.json();
-}).then(function (json) {
-  console.log(json);
-  var features = new _format.GeoJSON().readFeatures(json);
-  vectorSource.addFeatures(features);
-  map.getView().fit(vectorSource.getExtent());
-});
+var ModifyAttrControl = function (Control) {
+  function ModifyAttrControl(opt_options) {
+    var options = opt_options || {};
+    var button = document.createElement('button');
+    button.innerHTML = 'B';
+    $(button).attr("title", "属性修改");
+    var element = document.createElement('div');
+    element.className = 'modify-attr ol-unselectable ol-control';
+    element.appendChild(button);
+    Control.call(this, {
+      element: element,
+      target: options.target
+    });
+    button.addEventListener('click', this.modifyAttr.bind(this), false);
+  }
+
+  if (Control) ModifyAttrControl.__proto__ = Control;
+  ModifyAttrControl.prototype = Object.create(Control && Control.prototype);
+  ModifyAttrControl.prototype.constructor = ModifyAttrControl;
+
+  ModifyAttrControl.prototype.modifyAttr = function modifyAttr() {
+    if (overlay.getPosition() != undefined) {
+      //** start转换为修改属性界面，拆分span，并给提交按钮添加提交方法
+      $("#popup-content").children("span").each(function () {
+        var text = $(this).text().split(':');
+        $(this).text(text[0] + "：");
+        $(this).append("<input type='text' value='" + text[1] + "'></input>");
+      });
+      $("#popup-content").append("<button class='btn btn-primary' id='modifyAttrBtn'>提交</button>");
+      $("#modifyAttrBtn").click(function () {
+        var f = selectedFeature; //如果存在选中元素
+
+        if (f) {
+          //** start得到所有span和input的值
+          var spanVals = [];
+          var inputVal = [];
+          $("#popup-content").children("span").each(function () {
+            spanVals.push($(this).text().split('：')[0]);
+            inputVal.push($(this).children("input").first().val());
+          }); //** end得到所有span和input的值
+          //** start修改值传入feature
+
+          for (var i = 0; i < spanVals.length; i++) {
+            f.set(spanVals[i], inputVal[i]);
+          } //** end修改值传入feature
+
+          /**
+           * start----此处修改存在坐标倒置情况，要交换坐标（bate）
+           * 第一次查询坐标是倒置的，修改提交后再此查询坐标就不会倒置了，但是这样再交换坐标就有坐标xy倒置情况，
+           * 解决方式是：因为中国境内所有点的经度都大于维度，所以通过xy值的大小进行倒置操作，所以这里的逻辑是有漏洞的
+           */
+
+
+          var coordianates = f.values_.geometry.flatCoordinates;
+          if (coordianates[1] < coordianates[0]) f.values_.geometry.flatCoordinates = [coordianates[1], coordianates[0]]; //** end-----此处修改存在坐标倒置情况，要交换坐标
+
+          f.setGeometryName("geom"); // do this if geometry isn't named 'geometry'
+
+          var wfs = new _format.WFS({});
+          var transaction = wfs.writeTransaction(null, [f], null, {
+            featureNS: "http://192.168.50.254:12222/geoserver/postgis",
+            featurePrefix: "postgis",
+            featureType: "环翠区海洋牧场位置"
+          });
+          var data = new XMLSerializer().serializeToString(transaction);
+          $.ajax({
+            type: "POST",
+            url: "http://192.168.50.254:12222/geoserver/postgis/wfs",
+            data: data,
+            contentType: "text/xml",
+            success: function success(d) {
+              console.log(d);
+            },
+            fail: function fail(d) {
+              console.log(d);
+            }
+          }); //** start 关闭标签
+
+          overlay.setPosition(undefined);
+          closer.blur(); //** end 关闭标签
+        } else {
+          alert("选中元素不存在！");
+        }
+      }); //** end转换为修改属性界面，拆分span，并给提交按钮添加提交方法
+    } else {
+      alert("没有指定修改元素！");
+    }
+  };
+
+  return ModifyAttrControl;
+}(_control.Control);
+/**
+ * 自定义删除控件
+ * */
+
+
+var DeleteElementControl = function (Control) {
+  function DeleteElementControl(opt_options) {
+    var options = opt_options || {};
+    var button = document.createElement('button');
+    button.innerHTML = 'D';
+    $(button).attr("title", "元素删除");
+    var element = document.createElement('div');
+    element.className = 'delete-element ol-unselectable ol-control';
+    element.appendChild(button);
+    Control.call(this, {
+      element: element,
+      target: options.target
+    });
+    button.addEventListener('click', this.deleteElement.bind(this), false);
+  }
+
+  if (Control) DeleteElementControl.__proto__ = Control;
+  DeleteElementControl.prototype = Object.create(Control && Control.prototype);
+  DeleteElementControl.prototype.constructor = DeleteElementControl;
+
+  DeleteElementControl.prototype.deleteElement = function deleteElement() {
+    // this.getMap().getView().setRotation(0);
+    alert("选择地图删除选中元素！");
+    deleteStatusFlag = true;
+  };
+
+  return DeleteElementControl;
+}(_control.Control);
+/**
+ * 自定义添加控件
+ * */
+
+
+var AddElementControl = function (Control) {
+  function AddElementControl(opt_options) {
+    var options = opt_options || {};
+    var button = document.createElement('button');
+    button.innerHTML = 'A';
+    $(button).attr("title", "元素添加");
+    var element = document.createElement('div');
+    element.className = 'add-element ol-unselectable ol-control';
+    element.appendChild(button);
+    Control.call(this, {
+      element: element,
+      target: options.target
+    });
+    button.addEventListener('click', this.addElement.bind(this), false);
+  }
+
+  if (Control) AddElementControl.__proto__ = Control;
+  AddElementControl.prototype = Object.create(Control && Control.prototype);
+  AddElementControl.prototype.constructor = AddElementControl;
+
+  AddElementControl.prototype.addElement = function addElement() {
+    alert("点击地图添加元素！");
+    addStatusFlag = true;
+  };
+
+  return AddElementControl;
+}(_control.Control);
+
 var map = new _Map.default({
+  controls: (0, _control.defaults)().extend([new ModifyAttrControl(), new DeleteElementControl(), new AddElementControl()]),
+  interactions: (0, _interaction.defaults)().extend([select]),
   layers: [new _Tile.default({
     source: new _OSM.default()
-  }), // new TileLayer({
-  //     source: new TileWMS({
-  //         url: 'http://192.168.50.254:12222/geoserver/postgis/wms',
-  //         params: {
-  //             'LAYERS': 'postgis:环翠区海洋牧场位置 （测绘院）',
-  //             'TILED': true
-  //         }
-  //     })
-  // }),
+  }),
+  /**
+   * 添加TileMWS的方式之一
+   new TileLayer({
+      source: new TileWMS({
+          url: 'http://192.168.50.254:12222/geoserver/postgis/wms',
+          params: {
+              'LAYERS': 'postgis:环翠区海洋牧场位置',
+              'TILED': true
+          }
+      })
+  }),
+   **/
   wmsLayer, vector],
   overlays: [overlay],
   target: 'map',
   view: new _View.default({
-    // center: [122.20985412597656,37.45410919189454],
-    // zoom: 11,
+    /**
+     * 设置地图中心点和显示级别
+     center: [122.20985412597656,37.45410919189454],
+     zoom: 11,
+     **/
     projection: 'EPSG:4326'
   })
 });
-map.on('singleclick', function (evt) {
-  var coordinate = evt.coordinate;
-  console.log(coordinate);
-  var view = map.getView();
-  var viewResolution = view.getResolution();
-  var source = wmsLayer.getSource();
-  var url = source.getGetFeatureInfoUrl(evt.coordinate, viewResolution, view.getProjection(), {
-    'INFO_FORMAT': 'application/json',
-    'FEATURE_COUNT': 50
-  }); // content.innerHTML = '<p>你点击处的坐标为:</p><code>' + coordinate +
-  //     '</code>';
+/**
+ * http请求WFS数据
+ * **/
 
-  $.ajax({
-    url: url,
-    type: "GET",
-    dataTYPE: "jsonp",
-    success: function success(json) {
-      var result = JSON.stringify(json);
-
-      if (json.features.length > 0) {
-        overlay.setPosition(coordinate);
-        var properties = json.features[0].properties;
-        var popup_content = $("#popup-content");
-        popup_content.empty();
-        var popup_content_innerstr = "";
-        $.each(properties, function (n, v) {
-          popup_content_innerstr = popup_content_innerstr + "<span>" + n + ":" + v + "</span><br/>";
-        });
-        popup_content.append(popup_content_innerstr);
-      }
-    }
-  });
+fetch('http://192.168.50.254:12222/geoserver/postgis/wfs?' + 'service=wfs&' + 'version=2.0.0&' + 'request=GetFeature&' + 'typeNames=postgis:环翠区海洋牧场位置&' + 'outputFormat=application/json', {
+  method: 'GET'
+}).then(function (response) {
+  return response.json();
+}).then(function (json) {
+  var features = new _format.GeoJSON().readFeatures(json);
+  vectorSource.addFeatures(features);
+  map.getView().fit(vectorSource.getExtent());
 });
-},{"ol/Map.js":"../node_modules/ol/Map.js","ol/View.js":"../node_modules/ol/View.js","ol/layer/Tile.js":"../node_modules/ol/layer/Tile.js","ol/source/OSM.js":"../node_modules/ol/source/OSM.js","ol/Overlay.js":"../node_modules/ol/Overlay.js","ol/layer/Image.js":"../node_modules/ol/layer/Image.js","ol/source/ImageWMS.js":"../node_modules/ol/source/ImageWMS.js","ol/format.js":"../node_modules/ol/format.js","ol/layer.js":"../node_modules/ol/layer.js","ol/source/Vector.js":"../node_modules/ol/source/Vector.js","jquery":"node_modules/jquery/dist/jquery.js"}],"node_modules/_parcel-bundler@1.11.0@parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+/**
+ * 定义地图单击事件
+ * */
+
+map.on('singleclick', function (evt) {
+  var coordinate = evt.coordinate; // console.log(coordinate);
+
+  if (addStatusFlag) {
+    var feature = new _Feature.default({
+      geom: new _Point.default([coordinate[0], coordinate[1]])
+    });
+    var xml = new _format.WFS({}).writeTransaction([feature], null, null, {
+      featureNS: "http://192.168.50.254:12222/geoserver/postgis",
+      //该图层所在工作空间的uri
+      featurePrefix: "postgis",
+      //工作空间名称
+      featureType: "环翠区海洋牧场位置" //图层名称
+
+    });
+    var serializer = new XMLSerializer();
+    var featString = serializer.serializeToString(xml); //需要把字符串序列化为xml格式
+
+    $.ajax({
+      url: "http://192.168.50.254:12222/geoserver/postgis/wfs",
+      type: "POST",
+      data: featString,
+      contentType: 'text/xml',
+      success: function success(req) {
+        map.renderSync();
+        console.log(req);
+      }
+    });
+    addStatusFlag = false;
+  } else {
+    var view = map.getView();
+    var viewResolution = view.getResolution();
+    var source = wmsLayer.getSource();
+    var url = source.getGetFeatureInfoUrl(evt.coordinate, viewResolution, view.getProjection(), {
+      'INFO_FORMAT': 'application/json',
+      'FEATURE_COUNT': 50
+    });
+    $.ajax({
+      url: url,
+      type: "GET",
+      dataTYPE: "jsonp",
+      success: function success(json) {
+        var result = JSON.stringify(json);
+
+        if (json.features.length > 0) {
+          overlay.setPosition(coordinate);
+          var properties = json.features[0].properties;
+          var popup_content = $("#popup-content");
+          popup_content.empty();
+          var popup_content_innerstr = "";
+          $.each(properties, function (n, v) {
+            popup_content_innerstr = popup_content_innerstr + "<span>" + n + ":" + v + "</span><br/>";
+          });
+          popup_content.append(popup_content_innerstr);
+        }
+      }
+    });
+  }
+});
+/**
+ * 设置选中事件
+ * */
+
+select.setActive(true);
+var selected = select.getFeatures();
+selected.on('add', function (evt) {
+  selectedFeature = evt.element;
+
+  if (deleteStatusFlag) {
+    var f = selectedFeature;
+    var xml = new _format.WFS({}).writeTransaction(null, null, [f], {
+      featureNS: "http://192.168.50.254:12222/geoserver/postgis",
+      //该图层所在工作空间的uri
+      featurePrefix: "postgis",
+      //工作空间名称
+      featureType: "环翠区海洋牧场位置" //图层名称
+
+    });
+    var serializer = new XMLSerializer();
+    var featString = serializer.serializeToString(xml); //需要把字符串序列化为xml格式
+
+    $.ajax({
+      url: "http://192.168.50.254:12222/geoserver/postgis/wfs",
+      type: "POST",
+      data: featString,
+      contentType: 'text/xml',
+      success: function success(req) {
+        console.log(req);
+      }
+    });
+    deleteStatusFlag = false;
+  }
+});
+},{"ol/Map.js":"../node_modules/ol/Map.js","ol/View.js":"../node_modules/ol/View.js","ol/layer/Tile.js":"../node_modules/ol/layer/Tile.js","ol/source/OSM.js":"../node_modules/ol/source/OSM.js","ol/Overlay.js":"../node_modules/ol/Overlay.js","ol/layer/Image.js":"../node_modules/ol/layer/Image.js","ol/source/ImageWMS.js":"../node_modules/ol/source/ImageWMS.js","ol/format.js":"../node_modules/ol/format.js","ol/layer.js":"../node_modules/ol/layer.js","ol/source/Vector.js":"../node_modules/ol/source/Vector.js","ol/interaction.js":"../node_modules/ol/interaction.js","ol/control.js":"../node_modules/ol/control.js","ol/Feature.js":"../node_modules/ol/Feature.js","ol/geom/Point":"../node_modules/ol/geom/Point.js","jquery":"node_modules/jquery/dist/jquery.js"}],"node_modules/_parcel-bundler@1.11.0@parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -79547,7 +81926,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "13046" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "3113" + '/');
 
   ws.onmessage = function (event) {
     var data = JSON.parse(event.data);
