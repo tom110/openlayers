@@ -16,6 +16,11 @@ import {defaults as defaultControls, Control} from 'ol/control.js';
 import Feature from 'ol/Feature.js';
 import Point from 'ol/geom/Point';
 
+import WMTS from 'ol/source/WMTS.js';
+import WMTSTileGrid from 'ol/tilegrid/WMTS.js';
+import {get as getProjection} from 'ol/proj.js';
+import {getWidth, getTopLeft} from 'ol/extent.js';
+
 /**
  * 引入jquery
  * */
@@ -33,7 +38,25 @@ var addStatusFlag = false;
 /**
  * 存储是否处于删除状态的变量
  * */
-var deleteStatusFlag=false;
+var deleteStatusFlag = false;
+
+/**
+ * 天地图常量
+ * */
+var webKey = '7be8ab90bcbc9029cd288e0f569a42a2';
+var wmtsUrl_1 = 'http://t{0-7}.tianditu.gov.cn/vec_w/wmts?tk='; //矢量底图
+var wmtsUrl_2 = 'http://t{0-7}.tianditu.gov.cn/cva_w/wmts?tk='; //矢量注记
+
+var projection = getProjection('EPSG:3857');
+var projectionExtent = projection.getExtent();
+var size = getWidth(projectionExtent) / 256;
+var resolutions = new Array(18);
+var matrixIds = new Array(18);
+for (var z = 1; z < 19; ++z) {
+    // generate resolutions and matrixIds arrays for this WMTS
+    resolutions[z] = size / Math.pow(2, z);
+    matrixIds[z] = z;
+}
 
 
 /**
@@ -87,6 +110,42 @@ var wmsLayer = new ImageLayer({
 var vectorSource = new VectorSource();
 var vector = new VectorLayer({
     source: vectorSource,
+});
+
+var tiandituLayer = new TileLayer({
+    opacity: 0.7,
+    source: new WMTS({
+        url: wmtsUrl_1 + webKey,
+        layer: 'vec',
+        matrixSet: 'w',
+        format: 'tiles',
+        style: 'default',
+        projection: projection,
+        tileGrid: new WMTSTileGrid({
+            origin: getTopLeft(projectionExtent),
+            resolutions: resolutions,
+            matrixIds: matrixIds
+        }),
+        wrapX: true
+    })
+});
+
+var tiandituLabelLayer=new TileLayer({
+    opacity: 0.7,
+    source: new WMTS({
+        url: wmtsUrl_2 + webKey,
+        layer: 'cva',
+        matrixSet: 'w',
+        format: 'tiles',
+        style: 'default',
+        projection: projection,
+        tileGrid: new WMTSTileGrid({
+            origin: getTopLeft(projectionExtent),
+            resolutions: resolutions,
+            matrixIds: matrixIds
+        }),
+        wrapX: true
+    })
 });
 
 
@@ -278,9 +337,11 @@ var map = new Map({
     ]),
     interactions: defaultInteractions().extend([select]),
     layers: [
-        new TileLayer({
-            source: new OSM()
-        }),
+        // new TileLayer({
+        //     source: new OSM()
+        // }),
+        tiandituLayer,
+        tiandituLabelLayer,
         /**
          * 添加TileMWS的方式之一
          new TileLayer({
@@ -401,8 +462,8 @@ select.setActive(true);
 var selected = select.getFeatures();
 selected.on('add', function (evt) {
     selectedFeature = evt.element;
-    if(deleteStatusFlag){
-        var f=selectedFeature;
+    if (deleteStatusFlag) {
+        var f = selectedFeature;
         var xml = new WFS({}).writeTransaction(null, null, [f], {
             featureNS: "http://192.168.50.254:12222/geoserver/postgis",//该图层所在工作空间的uri
             featurePrefix: "postgis",//工作空间名称
