@@ -1,7 +1,6 @@
 import Map from 'ol/Map.js';
 import View from 'ol/View.js';
 import TileLayer from 'ol/layer/Tile.js';
-import OSM from 'ol/source/OSM.js';
 import Overlay from 'ol/Overlay.js';
 import ImageLayer from 'ol/layer/Image.js';
 import ImageWMS from 'ol/source/ImageWMS.js';
@@ -41,11 +40,14 @@ var addStatusFlag = false;
 var deleteStatusFlag = false;
 
 /**
- * 天地图常量
+ * 天地图常量及必要加载参数
  * */
 var webKey = '7be8ab90bcbc9029cd288e0f569a42a2';
 var wmtsUrl_1 = 'http://t{0-7}.tianditu.gov.cn/vec_w/wmts?tk='; //矢量底图
 var wmtsUrl_2 = 'http://t{0-7}.tianditu.gov.cn/cva_w/wmts?tk='; //矢量注记
+
+// var wmtsUrl_1 = 'http://t{0-7}.tianditu.gov.cn/img_w/wmts?tk='; //矢量底图
+// var wmtsUrl_2 = 'http://t{0-7}.tianditu.gov.cn/cia_w/wmts?tk='; //矢量注记
 
 var projection = getProjection('EPSG:3857');
 var projectionExtent = projection.getExtent();
@@ -112,6 +114,9 @@ var vector = new VectorLayer({
     source: vectorSource,
 });
 
+/**
+ * 天地图底图 WMTS服务
+ * */
 var tiandituLayer = new TileLayer({
     opacity: 0.7,
     source: new WMTS({
@@ -129,7 +134,6 @@ var tiandituLayer = new TileLayer({
         wrapX: true
     })
 });
-
 var tiandituLabelLayer=new TileLayer({
     opacity: 0.7,
     source: new WMTS({
@@ -337,9 +341,6 @@ var map = new Map({
     ]),
     interactions: defaultInteractions().extend([select]),
     layers: [
-        // new TileLayer({
-        //     source: new OSM()
-        // }),
         tiandituLayer,
         tiandituLabelLayer,
         /**
